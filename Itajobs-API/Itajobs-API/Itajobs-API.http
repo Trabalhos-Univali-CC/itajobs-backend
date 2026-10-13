@@ -1,0 +1,38 @@
+@host = http://localhost:5176
+
+### Listar
+GET {{host}}/api/exemplo
+Accept: application/json
+
+### Listar apenas ativos
+GET {{host}}/api/exemplo?apenasAtivos=true
+Accept: application/json
+
+### Obter por id
+GET {{host}}/api/exemplo/1
+Accept: application/json
+
+### Criar
+POST {{host}}/api/exemplo
+Content-Type: application/json
+
+{
+  "nome": "Primeiro exemplo",
+  "descricao": "Criado pelo arquivo .http",
+  "quantidade": 3,
+  "ativo": true
+}
+
+### Atualizar
+PUT {{host}}/api/exemplo/1
+Content-Type: application/json
+
+{
+  "nome": "Exemplo atualizado",
+  "descricao": "Novo texto",
+  "quantidade": 7,
+  "ativo": true
+}
+
+### Remover
+DELETE {{host}}/api/exemplo/1
