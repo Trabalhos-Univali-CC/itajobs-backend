@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\itajobs\\itajobs-backend\\Itajobs-API\\Itajobs-API\\Itajobs-API.csproj": {}
+    "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\Faculdade\\itajobs\\itajobs-backend\\Itajobs-API.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\itajobs\\itajobs-backend\\Itajobs-API\\Itajobs-API\\Itajobs-API.csproj": {
+    "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\Faculdade\\itajobs\\itajobs-backend\\Itajobs-API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\itajobs\\itajobs-backend\\Itajobs-API\\Itajobs-API\\Itajobs-API.csproj",
+        "projectUniqueName": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\Faculdade\\itajobs\\itajobs-backend\\Itajobs-API.csproj",
         "projectName": "Itajobs-API",
-        "projectPath": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\itajobs\\itajobs-backend\\Itajobs-API\\Itajobs-API\\Itajobs-API.csproj",
+        "projectPath": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\Faculdade\\itajobs\\itajobs-backend\\Itajobs-API.csproj",
         "packagesPath": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\itajobs\\itajobs-backend\\Itajobs-API\\Itajobs-API\\obj\\",
+        "outputPath": "C:\\Users\\Ⓐ𝓷₲ᗴム𐌈\\Documents\\Trabalho\\Faculdade\\itajobs\\itajobs-backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
