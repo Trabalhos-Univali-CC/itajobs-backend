@@ -1,3 +1,5 @@
+using Itajobs_API.src.Models;
+
 namespace Itajobs_API.src.DTO
 {
     /// <summary>
@@ -18,5 +20,13 @@ namespace Itajobs_API.src.DTO
         public string NomeCandidato { get; set; } = string.Empty;
 
         public DateTime DataCandidatura { get; set; }
+
+        public StatusCandidatura Status { get; set; }
+
+        /// <summary>Quando a empresa mudou o status pela ultima vez.</summary>
+        public DateTime? DataStatus { get; set; }
+
+        /// <summary>Se a vaga ja foi encerrada pela empresa.</summary>
+        public StatusVaga StatusVaga { get; set; }
     }
 }

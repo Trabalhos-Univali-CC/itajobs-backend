@@ -1,3 +1,5 @@
+using Itajobs_API.src.Models;
+
 namespace Itajobs_API.src.DTO
 {
     /// <summary>
@@ -17,5 +19,17 @@ namespace Itajobs_API.src.DTO
         public string Descricao { get; set; } = string.Empty;
 
         public decimal? Salario { get; set; }
+
+        public TipoContrato TipoContrato { get; set; }
+
+        public Jornada Jornada { get; set; }
+
+        public string? Bairro { get; set; }
+
+        public string? Requisitos { get; set; }
+
+        public StatusVaga Status { get; set; }
+
+        public DateTime DataPublicacao { get; set; }
     }
 }

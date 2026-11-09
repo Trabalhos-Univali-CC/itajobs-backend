@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Itajobs_API.src.DTO;
 using Itajobs_API.src.Services;
@@ -8,6 +9,10 @@ namespace Itajobs_API.src.Controllers
     /// Rotas de empresa. As vagas de uma empresa saem em
     /// <c>GET /api/vaga?idEmpresa={id}</c>.
     /// </summary>
+    /// <remarks>
+    /// Acesso: o cadastro e publico; ver exige login; alterar e apagar, so a propria
+    /// empresa. As avaliacoes ficam no <see cref="AvaliacaoController"/>.
+    /// </remarks>
     [ApiController]
     [Route("api/[controller]")]
     public class EmpresaController : ControllerBase
@@ -40,6 +45,7 @@ namespace Itajobs_API.src.Controllers
         }
 
         /// <summary>POST /api/empresa</summary>
+        [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] EmpresaCreateDTO dto)
         {
@@ -51,20 +57,9 @@ namespace Itajobs_API.src.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] EmpresaCreateDTO dto)
         {
+            UsuarioLogado.Exigir(User.Usuario().EhEmpresa(id));
+
             var atualizada = await _service.UpdateAsync(id, dto);
-            if (atualizada is null)
-            {
-                return NotFound(new { mensagem = $"Empresa {id} nao encontrada." });
-            }
-
-            return Ok(atualizada);
-        }
-
-        /// <summary>PATCH /api/empresa/5/nota</summary>
-        [HttpPatch("{id:int}/nota")]
-        public async Task<IActionResult> AtualizarNota(int id, [FromBody] NotaDTO dto)
-        {
-            var atualizada = await _service.AtualizarNotaAsync(id, dto.Nota!.Value);
             if (atualizada is null)
             {
                 return NotFound(new { mensagem = $"Empresa {id} nao encontrada." });
@@ -77,6 +72,8 @@ namespace Itajobs_API.src.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
+            UsuarioLogado.Exigir(User.Usuario().EhEmpresa(id));
+
             if (!await _service.DeleteAsync(id))
             {
                 return NotFound(new { mensagem = $"Empresa {id} nao encontrada." });

@@ -1,6 +1,7 @@
 using Itajobs_API.src.DTO;
 using Itajobs_API.src.Models;
 using Itajobs_API.src.Repositories;
+using Itajobs_API.src.Utils;
 
 namespace Itajobs_API.src.Services
 {
@@ -12,6 +13,8 @@ namespace Itajobs_API.src.Services
     /// <item>A vaga e o candidato precisam existir.</item>
     /// <item>O candidato so se candidata depois de criar o curriculo.</item>
     /// <item>O mesmo candidato nao se candidata duas vezes a mesma vaga.</item>
+    /// <item>Vaga encerrada nao aceita candidatura nova.</item>
+    /// <item>A candidatura nasce "recebida"; so a empresa dona da vaga muda o status.</item>
     /// </list>
     /// </remarks>
     public class CandidaturaService
@@ -30,15 +33,15 @@ namespace Itajobs_API.src.Services
             _candidatoRepository = candidatoRepository;
         }
 
-        /// <summary><c>null</c> = vaga nao encontrada.</summary>
-        public async Task<List<CandidaturaDTO>?> GetByVagaAsync(int idVaga)
+        /// <summary><c>null</c> = vaga nao encontrada. <paramref name="status"/> <c>null</c> traz todas.</summary>
+        public async Task<List<CandidaturaDTO>?> GetByVagaAsync(int idVaga, StatusCandidatura? status = null)
         {
             if (await _vagaRepository.GetByIdAsync(idVaga) is null)
             {
                 return null;
             }
 
-            var candidaturas = await _repository.GetByVagaAsync(idVaga);
+            var candidaturas = await _repository.GetByVagaAsync(idVaga, status);
             return candidaturas.Select(ToDTO).ToList();
         }
 
@@ -63,6 +66,12 @@ namespace Itajobs_API.src.Services
             if (vaga is null)
             {
                 return null;
+            }
+
+            if (vaga.Status == StatusVaga.Encerrada)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido,
+                    "Esta vaga esta encerrada e nao aceita mais candidaturas.");
             }
 
             var candidato = await _candidatoRepository.GetByIdAsync(idCandidato);
@@ -96,6 +105,25 @@ namespace Itajobs_API.src.Services
             return ToDTO(criada);
         }
 
+        /// <summary><c>null</c> = o candidato nao se candidatou a esta vaga.</summary>
+        public async Task<CandidaturaDTO?> AlterarStatusAsync(int idVaga, int idCandidato, StatusCandidatura status)
+        {
+            var candidatura = await _repository.GetAsync(idVaga, idCandidato);
+            if (candidatura is null)
+            {
+                return null;
+            }
+
+            if (candidatura.Status != status)
+            {
+                candidatura.Status = status;
+                candidatura.DataStatus = Relogio.Agora;
+                await _repository.UpdateAsync(candidatura);
+            }
+
+            return ToDTO(candidatura);
+        }
+
         public async Task<bool> DeleteAsync(int idVaga, int idCandidato)
         {
             var candidatura = await _repository.GetAsync(idVaga, idCandidato);
@@ -116,7 +144,10 @@ namespace Itajobs_API.src.Services
             NomeEmpresa = candidatura.Vaga.Empresa.Nome,
             IdCandidato = candidatura.IdCandidato,
             NomeCandidato = $"{candidatura.Candidato.Nome} {candidatura.Candidato.Sobrenome}",
-            DataCandidatura = candidatura.DataCandidatura
+            DataCandidatura = candidatura.DataCandidatura,
+            Status = candidatura.Status,
+            DataStatus = candidatura.DataStatus,
+            StatusVaga = candidatura.Vaga.Status
         };
     }
 }

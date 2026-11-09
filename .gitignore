@@ -1,0 +1,19 @@
+# Segredos (banco, JWT_SECRET...). So o exemplo, sem valores, vai para o repositorio.
+*.env
+.env.*
+!*.env.example
+appsettings.*.local.json
+*.pfx
+*.pem
+*.key
+
+# Saida de build: o build copia o itajobs.env para bin/, entao ela nunca entra.
+bin/
+obj/
+
+# Arquivos locais do Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo

@@ -34,5 +34,11 @@ namespace Itajobs_API.src.Models
         [MaxLength(100)]
         [Column("complemento")]
         public string? Complemento { get; set; }
+
+        /// <summary>Guardado sem mascara: 8 digitos. Precisa ser de Itajai/SC.</summary>
+        [Required]
+        [MaxLength(8)]
+        [Column("cep")]
+        public string Cep { get; set; } = string.Empty;
     }
 }

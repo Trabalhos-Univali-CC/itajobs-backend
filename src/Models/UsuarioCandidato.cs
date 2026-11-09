@@ -38,6 +38,12 @@ namespace Itajobs_API.src.Models
 
         public Contato Contato { get; set; } = null!;
 
+        /// <summary>Hash PBKDF2 da senha (nunca a senha em texto). Ver <c>SenhaHasher</c>.</summary>
+        [Required]
+        [MaxLength(255)]
+        [Column("senha_hash")]
+        public string SenhaHash { get; set; } = string.Empty;
+
         public Curriculo? Curriculo { get; set; }
 
         public List<Candidatura> Candidaturas { get; set; } = [];

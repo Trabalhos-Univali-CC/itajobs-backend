@@ -30,9 +30,15 @@ namespace Itajobs_API.src.Repositories
             return curriculo;
         }
 
+        public async Task UpdateAsync(Curriculo curriculo)
+        {
+            _context.Curriculos.Update(curriculo);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task DeleteAsync(Curriculo curriculo)
         {
-            // Experiencias e habilidades saem pelo ON DELETE CASCADE do banco.
+            // Itens e arquivos saem pelo ON DELETE CASCADE do banco.
             _context.Curriculos.Remove(curriculo);
             await _context.SaveChangesAsync();
         }
@@ -88,12 +94,114 @@ namespace Itajobs_API.src.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task<LogFormacao?> GetFormacaoAsync(int idCurriculo, int idFormacao)
+        {
+            return await _context.Formacoes
+                .FirstOrDefaultAsync(f => f.Id == idFormacao && f.IdCurriculo == idCurriculo);
+        }
+
+        public async Task<LogFormacao> AddFormacaoAsync(LogFormacao formacao)
+        {
+            _context.Formacoes.Add(formacao);
+            await _context.SaveChangesAsync();
+            return formacao;
+        }
+
+        public async Task UpdateFormacaoAsync(LogFormacao formacao)
+        {
+            _context.Formacoes.Update(formacao);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteFormacaoAsync(LogFormacao formacao)
+        {
+            _context.Formacoes.Remove(formacao);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<LogCurso?> GetCursoAsync(int idCurriculo, int idCurso)
+        {
+            return await _context.Cursos
+                .FirstOrDefaultAsync(c => c.Id == idCurso && c.IdCurriculo == idCurriculo);
+        }
+
+        public async Task<LogCurso> AddCursoAsync(LogCurso curso)
+        {
+            _context.Cursos.Add(curso);
+            await _context.SaveChangesAsync();
+            return curso;
+        }
+
+        public async Task UpdateCursoAsync(LogCurso curso)
+        {
+            _context.Cursos.Update(curso);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteCursoAsync(LogCurso curso)
+        {
+            _context.Cursos.Remove(curso);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<CurriculoArquivo>> GetArquivosSemConteudoAsync(int idCurriculo)
+        {
+            // Projecao: o SELECT nao traz a coluna "conteudo".
+            return await _context.CurriculoArquivos.AsNoTracking()
+                .Where(a => a.IdCurriculo == idCurriculo)
+                .OrderBy(a => a.Tipo)
+                .Select(a => new CurriculoArquivo
+                {
+                    IdCurriculo = a.IdCurriculo,
+                    Tipo = a.Tipo,
+                    Nome = a.Nome,
+                    ContentType = a.ContentType,
+                    Tamanho = a.Tamanho,
+                    EnviadoEm = a.EnviadoEm
+                })
+                .ToListAsync();
+        }
+
+        public async Task<CurriculoArquivo?> GetArquivoAsync(int idCurriculo, TipoArquivo tipo)
+        {
+            return await _context.CurriculoArquivos.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.IdCurriculo == idCurriculo && a.Tipo == tipo);
+        }
+
+        public async Task SalvarArquivoAsync(CurriculoArquivo arquivo)
+        {
+            var existe = await _context.CurriculoArquivos
+                .AnyAsync(a => a.IdCurriculo == arquivo.IdCurriculo && a.Tipo == arquivo.Tipo);
+
+            if (existe)
+            {
+                _context.CurriculoArquivos.Update(arquivo);
+            }
+            else
+            {
+                _context.CurriculoArquivos.Add(arquivo);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> DeleteArquivoAsync(int idCurriculo, TipoArquivo tipo)
+        {
+            // Apaga direto no banco, sem ler o conteudo antes.
+            var apagados = await _context.CurriculoArquivos
+                .Where(a => a.IdCurriculo == idCurriculo && a.Tipo == tipo)
+                .ExecuteDeleteAsync();
+            return apagados > 0;
+        }
+
         private IQueryable<Curriculo> ComItens()
         {
             return _context.Curriculos
                 .Include(c => c.Candidato)
                 .Include(c => c.Experiencias.OrderByDescending(e => e.DataInicio))
-                .Include(c => c.Habilidades.OrderBy(h => h.Descricao));
+                .Include(c => c.Habilidades.OrderBy(h => h.Descricao))
+                .Include(c => c.Formacoes.OrderByDescending(f => f.DataInicio))
+                .Include(c => c.Cursos.OrderByDescending(c => c.DataConclusao));
         }
     }
 }

@@ -13,10 +13,10 @@ namespace Itajobs_API.src.Repositories
             _context = context;
         }
 
-        public async Task<List<Candidatura>> GetByVagaAsync(int idVaga)
+        public async Task<List<Candidatura>> GetByVagaAsync(int idVaga, StatusCandidatura? status = null)
         {
             return await Completas().AsNoTracking()
-                .Where(c => c.IdVaga == idVaga)
+                .Where(c => c.IdVaga == idVaga && (status == null || c.Status == status))
                 .OrderBy(c => c.DataCandidatura)
                 .ToListAsync();
         }
@@ -35,12 +35,24 @@ namespace Itajobs_API.src.Repositories
                 .FirstOrDefaultAsync(c => c.IdVaga == idVaga && c.IdCandidato == idCandidato);
         }
 
+        public async Task<bool> CandidatouNaEmpresaAsync(int idCandidato, int idEmpresa)
+        {
+            return await _context.Candidaturas
+                .AnyAsync(c => c.IdCandidato == idCandidato && c.Vaga.IdEmpresa == idEmpresa);
+        }
+
         public async Task<Candidatura> CreateAsync(Candidatura candidatura)
         {
             // DataCandidatura vem do DEFAULT do banco e o EF le de volta no insert.
             _context.Candidaturas.Add(candidatura);
             await _context.SaveChangesAsync();
             return candidatura;
+        }
+
+        public async Task UpdateAsync(Candidatura candidatura)
+        {
+            _context.Candidaturas.Update(candidatura);
+            await _context.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(Candidatura candidatura)

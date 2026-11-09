@@ -28,6 +28,28 @@ namespace Itajobs_API.src.Models
         [Column("salario", TypeName = "decimal(10,2)")]
         public decimal? Salario { get; set; }
 
+        [Column("tipo_contrato")]
+        public TipoContrato TipoContrato { get; set; }
+
+        [Column("jornada")]
+        public Jornada Jornada { get; set; }
+
+        /// <summary>Onde e o trabalho. Sem informar, vale o bairro da empresa.</summary>
+        [MaxLength(100)]
+        [Column("bairro")]
+        public string? Bairro { get; set; }
+
+        [Column("requisitos")]
+        public string? Requisitos { get; set; }
+
+        /// <summary>Vaga encerrada continua visivel, mas nao aceita candidatura.</summary>
+        [Column("status")]
+        public StatusVaga Status { get; set; } = StatusVaga.Aberta;
+
+        /// <summary>Preenchida pelo banco (DEFAULT CURRENT_TIMESTAMP).</summary>
+        [Column("data_publicacao")]
+        public DateTime DataPublicacao { get; set; }
+
         public List<Candidatura> Candidaturas { get; set; } = [];
     }
 }

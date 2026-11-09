@@ -21,5 +21,12 @@ namespace Itajobs_API.src.Models
         /// <summary>Preenchida pelo banco (DEFAULT CURRENT_TIMESTAMP).</summary>
         [Column("data_candidatura")]
         public DateTime DataCandidatura { get; set; }
+
+        [Column("status")]
+        public StatusCandidatura Status { get; set; } = StatusCandidatura.Recebida;
+
+        /// <summary>Ultima mudanca de status; <c>null</c> enquanto continua "recebida".</summary>
+        [Column("data_status")]
+        public DateTime? DataStatus { get; set; }
     }
 }

@@ -25,5 +25,9 @@ namespace Itajobs_API.src.DTO
 
         [Required(ErrorMessage = "Contato e obrigatorio.")]
         public ContatoDTO Contato { get; set; } = new();
+
+        /// <summary>Obrigatoria no POST. No PUT e ignorada: troca pelo <c>PUT /api/auth/senha</c>.</summary>
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "A senha deve ter entre 8 e 100 caracteres.")]
+        public string? Senha { get; set; }
     }
 }

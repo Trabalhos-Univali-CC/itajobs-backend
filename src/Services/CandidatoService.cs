@@ -11,16 +11,21 @@ namespace Itajobs_API.src.Services
     /// <list type="bullet">
     /// <item>CPF e guardado sem mascara e precisa ter digitos verificadores validos.</item>
     /// <item>CPF nao se repete entre candidatos.</item>
+    /// <item>E-mail nao se repete entre candidatos (uma empresa pode usar o mesmo).</item>
+    /// <item>Senha obrigatoria no cadastro; guardada so como hash. Depois so muda pelo <c>PUT /api/auth/senha</c>.</item>
+    /// <item>O endereco precisa ser de Itajai/SC (ver <see cref="EnderecoService"/>).</item>
     /// <item>Apagar o candidato apaga endereco, contato, curriculo e candidaturas.</item>
     /// </list>
     /// </remarks>
     public class CandidatoService
     {
         private readonly ICandidatoRepository _repository;
+        private readonly EnderecoService _enderecoService;
 
-        public CandidatoService(ICandidatoRepository repository)
+        public CandidatoService(ICandidatoRepository repository, EnderecoService enderecoService)
         {
             _repository = repository;
+            _enderecoService = enderecoService;
         }
 
         public async Task<List<CandidatoDTO>> GetAllAsync()
@@ -37,17 +42,24 @@ namespace Itajobs_API.src.Services
 
         public async Task<CandidatoDTO> CreateAsync(CandidatoCreateDTO dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Senha))
+            {
+                throw new RegraNegocioException(TipoErro.Invalido, "Senha e obrigatoria.");
+            }
+
             var cpf = await ValidarCpfAsync(dto.Cpf, ignorarId: null);
+            await ValidarEmailAsync(dto.Contato.Email, ignorarId: null);
 
             var candidato = new UsuarioCandidato
             {
                 Nome = dto.Nome.Trim(),
                 Sobrenome = dto.Sobrenome.Trim(),
                 Cpf = cpf,
+                SenhaHash = SenhaHasher.Gerar(dto.Senha),
                 Endereco = new Endereco(),
                 Contato = new Contato()
             };
-            EnderecoContatoMapper.Copiar(dto.Endereco, candidato.Endereco);
+            await _enderecoService.PreencherAsync(dto.Endereco, candidato.Endereco);
             EnderecoContatoMapper.Copiar(dto.Contato, candidato.Contato);
 
             var criado = await _repository.CreateAsync(candidato);
@@ -63,9 +75,10 @@ namespace Itajobs_API.src.Services
             }
 
             candidato.Cpf = await ValidarCpfAsync(dto.Cpf, ignorarId: id);
+            await ValidarEmailAsync(dto.Contato.Email, ignorarId: id);
             candidato.Nome = dto.Nome.Trim();
             candidato.Sobrenome = dto.Sobrenome.Trim();
-            EnderecoContatoMapper.Copiar(dto.Endereco, candidato.Endereco);
+            await _enderecoService.PreencherAsync(dto.Endereco, candidato.Endereco);
             EnderecoContatoMapper.Copiar(dto.Contato, candidato.Contato);
 
             await _repository.UpdateAsync(candidato);
@@ -100,6 +113,14 @@ namespace Itajobs_API.src.Services
             }
 
             return cpf;
+        }
+
+        private async Task ValidarEmailAsync(string email, int? ignorarId)
+        {
+            if (await _repository.EmailExisteAsync(EnderecoContatoMapper.NormalizarEmail(email), ignorarId))
+            {
+                throw new RegraNegocioException(TipoErro.Conflito, "Ja existe um candidato com este e-mail.");
+            }
         }
 
         private static CandidatoDTO ToDTO(UsuarioCandidato candidato) => new()

@@ -8,13 +8,19 @@ namespace Itajobs_API.src.Repositories
     /// </summary>
     public interface ICandidaturaRepository
     {
-        Task<List<Candidatura>> GetByVagaAsync(int idVaga);
+        /// <summary><paramref name="status"/> <c>null</c> traz todas.</summary>
+        Task<List<Candidatura>> GetByVagaAsync(int idVaga, StatusCandidatura? status = null);
 
         Task<List<Candidatura>> GetByCandidatoAsync(int idCandidato);
 
         Task<Candidatura?> GetAsync(int idVaga, int idCandidato);
 
+        /// <summary>Se o candidato ja se candidatou a alguma vaga da empresa.</summary>
+        Task<bool> CandidatouNaEmpresaAsync(int idCandidato, int idEmpresa);
+
         Task<Candidatura> CreateAsync(Candidatura candidatura);
+
+        Task UpdateAsync(Candidatura candidatura);
 
         Task DeleteAsync(Candidatura candidatura);
     }

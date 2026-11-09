@@ -88,7 +88,10 @@ namespace Itajobs_API.src.Utils
                    $"Port={Get(env, "DB_PORT", "5432")};" +
                    $"Database={Get(env, "DB_DATABASE")};" +
                    $"Username={Get(env, "DB_USER")};" +
-                   $"Password={Get(env, "DB_PASSWORD")}";
+                   $"Password={Get(env, "DB_PASSWORD")};" +
+                   // Fuso da sessao: os DEFAULT CURRENT_TIMESTAMP saem no horario de
+                   // Itajai, nao no fuso com que o Postgres foi instalado.
+                   $"Timezone={Get(env, "DB_TIMEZONE", "America/Sao_Paulo")}";
         }
     }
 }

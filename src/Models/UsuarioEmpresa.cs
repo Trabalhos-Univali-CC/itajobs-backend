@@ -32,9 +32,18 @@ namespace Itajobs_API.src.Models
 
         public Contato Contato { get; set; } = null!;
 
+        /// <summary>Hash PBKDF2 da senha (nunca a senha em texto). Ver <c>SenhaHasher</c>.</summary>
+        [Required]
+        [MaxLength(255)]
+        [Column("senha_hash")]
+        public string SenhaHash { get; set; } = string.Empty;
+
+        /// <summary>Media das <see cref="Avaliacoes"/>; <c>null</c> sem avaliacao.</summary>
         [Column("nota", TypeName = "decimal(5,2)")]
         public decimal? Nota { get; set; }
 
         public List<Vaga> Vagas { get; set; } = [];
+
+        public List<AvaliacaoEmpresa> Avaliacoes { get; set; } = [];
     }
 }

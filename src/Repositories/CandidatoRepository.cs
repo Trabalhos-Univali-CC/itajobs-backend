@@ -37,6 +37,20 @@ namespace Itajobs_API.src.Repositories
             return await _context.Candidatos.AnyAsync(c => c.Cpf == cpf && c.Id != ignorarId);
         }
 
+        public async Task<UsuarioCandidato?> GetByEmailAsync(string email)
+        {
+            return await _context.Candidatos.AsNoTracking()
+                .Include(c => c.Endereco)
+                .Include(c => c.Contato)
+                .Include(c => c.Curriculo)
+                .FirstOrDefaultAsync(c => c.Contato.Email == email);
+        }
+
+        public async Task<bool> EmailExisteAsync(string email, int? ignorarId = null)
+        {
+            return await _context.Candidatos.AnyAsync(c => c.Contato.Email == email && c.Id != ignorarId);
+        }
+
         public async Task<UsuarioCandidato> CreateAsync(UsuarioCandidato candidato)
         {
             _context.Candidatos.Add(candidato);

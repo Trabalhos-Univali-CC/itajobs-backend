@@ -11,20 +11,22 @@ namespace Itajobs_API.src.Services
     /// <list type="bullet">
     /// <item>CNPJ e guardado sem mascara e precisa ter digitos verificadores validos.</item>
     /// <item>CNPJ nao se repete entre empresas.</item>
-    /// <item>A nota vai de <see cref="NotaMinima"/> a <see cref="NotaMaxima"/> e so muda pela rota propria.</item>
-    /// <item>Apagar a empresa apaga endereco, contato, vagas e as candidaturas dessas vagas.</item>
+    /// <item>E-mail nao se repete entre empresas (um candidato pode usar o mesmo).</item>
+    /// <item>Senha obrigatoria no cadastro; guardada so como hash. Depois so muda pelo <c>PUT /api/auth/senha</c>.</item>
+    /// <item>O endereco precisa ser de Itajai/SC (ver <see cref="EnderecoService"/>).</item>
+    /// <item>A nota e a media das avaliacoes dos candidatos (ver <see cref="AvaliacaoService"/>); nao se edita aqui.</item>
+    /// <item>Apagar a empresa apaga endereco, contato, vagas, as candidaturas dessas vagas e as avaliacoes.</item>
     /// </list>
     /// </remarks>
     public class EmpresaService
     {
-        public const decimal NotaMinima = 0;
-        public const decimal NotaMaxima = 5;
-
         private readonly IEmpresaRepository _repository;
+        private readonly EnderecoService _enderecoService;
 
-        public EmpresaService(IEmpresaRepository repository)
+        public EmpresaService(IEmpresaRepository repository, EnderecoService enderecoService)
         {
             _repository = repository;
+            _enderecoService = enderecoService;
         }
 
         public async Task<List<EmpresaDTO>> GetAllAsync()
@@ -41,16 +43,23 @@ namespace Itajobs_API.src.Services
 
         public async Task<EmpresaDTO> CreateAsync(EmpresaCreateDTO dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Senha))
+            {
+                throw new RegraNegocioException(TipoErro.Invalido, "Senha e obrigatoria.");
+            }
+
             var cnpj = await ValidarCnpjAsync(dto.Cnpj, ignorarId: null);
+            await ValidarEmailAsync(dto.Contato.Email, ignorarId: null);
 
             var empresa = new UsuarioEmpresa
             {
                 Nome = dto.Nome.Trim(),
                 Cnpj = cnpj,
+                SenhaHash = SenhaHasher.Gerar(dto.Senha),
                 Endereco = new Endereco(),
                 Contato = new Contato()
             };
-            EnderecoContatoMapper.Copiar(dto.Endereco, empresa.Endereco);
+            await _enderecoService.PreencherAsync(dto.Endereco, empresa.Endereco);
             EnderecoContatoMapper.Copiar(dto.Contato, empresa.Contato);
 
             var criada = await _repository.CreateAsync(empresa);
@@ -66,29 +75,11 @@ namespace Itajobs_API.src.Services
             }
 
             empresa.Cnpj = await ValidarCnpjAsync(dto.Cnpj, ignorarId: id);
+            await ValidarEmailAsync(dto.Contato.Email, ignorarId: id);
             empresa.Nome = dto.Nome.Trim();
-            EnderecoContatoMapper.Copiar(dto.Endereco, empresa.Endereco);
+            await _enderecoService.PreencherAsync(dto.Endereco, empresa.Endereco);
             EnderecoContatoMapper.Copiar(dto.Contato, empresa.Contato);
 
-            await _repository.UpdateAsync(empresa);
-            return ToDTO(empresa);
-        }
-
-        public async Task<EmpresaDTO?> AtualizarNotaAsync(int id, decimal nota)
-        {
-            if (nota < NotaMinima || nota > NotaMaxima)
-            {
-                throw new RegraNegocioException(TipoErro.Invalido,
-                    $"A nota deve ficar entre {NotaMinima} e {NotaMaxima}.");
-            }
-
-            var empresa = await _repository.GetByIdAsync(id);
-            if (empresa is null)
-            {
-                return null;
-            }
-
-            empresa.Nota = Math.Round(nota, 2);
             await _repository.UpdateAsync(empresa);
             return ToDTO(empresa);
         }
@@ -123,12 +114,21 @@ namespace Itajobs_API.src.Services
             return cnpj;
         }
 
+        private async Task ValidarEmailAsync(string email, int? ignorarId)
+        {
+            if (await _repository.EmailExisteAsync(EnderecoContatoMapper.NormalizarEmail(email), ignorarId))
+            {
+                throw new RegraNegocioException(TipoErro.Conflito, "Ja existe uma empresa com este e-mail.");
+            }
+        }
+
         private static EmpresaDTO ToDTO(UsuarioEmpresa empresa) => new()
         {
             Id = empresa.Id,
             Nome = empresa.Nome,
             Cnpj = empresa.Cnpj,
             Nota = empresa.Nota,
+            TotalAvaliacoes = empresa.Avaliacoes.Count,
             Endereco = EnderecoContatoMapper.ToDTO(empresa.Endereco),
             Contato = EnderecoContatoMapper.ToDTO(empresa.Contato)
         };

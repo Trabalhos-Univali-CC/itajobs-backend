@@ -18,6 +18,7 @@ namespace Itajobs_API.src.Repositories
             return await _context.Empresas.AsNoTracking()
                 .Include(e => e.Endereco)
                 .Include(e => e.Contato)
+                .Include(e => e.Avaliacoes)
                 .OrderBy(e => e.Nome)
                 .ToListAsync();
         }
@@ -27,12 +28,27 @@ namespace Itajobs_API.src.Repositories
             return await _context.Empresas
                 .Include(e => e.Endereco)
                 .Include(e => e.Contato)
+                .Include(e => e.Avaliacoes)
                 .FirstOrDefaultAsync(e => e.Id == id);
         }
 
         public async Task<bool> CnpjExisteAsync(string cnpj, int? ignorarId = null)
         {
             return await _context.Empresas.AnyAsync(e => e.Cnpj == cnpj && e.Id != ignorarId);
+        }
+
+        public async Task<UsuarioEmpresa?> GetByEmailAsync(string email)
+        {
+            return await _context.Empresas.AsNoTracking()
+                .Include(e => e.Endereco)
+                .Include(e => e.Contato)
+                .Include(e => e.Avaliacoes)
+                .FirstOrDefaultAsync(e => e.Contato.Email == email);
+        }
+
+        public async Task<bool> EmailExisteAsync(string email, int? ignorarId = null)
+        {
+            return await _context.Empresas.AnyAsync(e => e.Contato.Email == email && e.Id != ignorarId);
         }
 
         public async Task<UsuarioEmpresa> CreateAsync(UsuarioEmpresa empresa)

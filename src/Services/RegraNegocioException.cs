@@ -13,7 +13,16 @@ namespace Itajobs_API.src.Services
         NaoEncontrado,
 
         /// <summary>Choca com o que ja esta no banco (CNPJ repetido, candidatura duplicada...).</summary>
-        Conflito
+        Conflito,
+
+        /// <summary>Credenciais erradas no login.</summary>
+        NaoAutenticado,
+
+        /// <summary>Usuario logado, mas o recurso e de outro usuario.</summary>
+        Proibido,
+
+        /// <summary>Um servico externo (ViaCEP...) nao respondeu.</summary>
+        Indisponivel
     }
 
     /// <summary>

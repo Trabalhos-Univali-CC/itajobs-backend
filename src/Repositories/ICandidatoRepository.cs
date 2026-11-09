@@ -15,6 +15,12 @@ namespace Itajobs_API.src.Repositories
         /// <summary><paramref name="ignorarId"/> deixa o proprio candidato de fora no PUT.</summary>
         Task<bool> CpfExisteAsync(string cpf, int? ignorarId = null);
 
+        /// <summary>Para o login: procura pelo e-mail do contato (ja em minusculas).</summary>
+        Task<UsuarioCandidato?> GetByEmailAsync(string email);
+
+        /// <summary>O e-mail e unico entre candidatos. <paramref name="ignorarId"/> deixa o proprio candidato de fora no PUT.</summary>
+        Task<bool> EmailExisteAsync(string email, int? ignorarId = null);
+
         Task<UsuarioCandidato> CreateAsync(UsuarioCandidato candidato);
 
         Task UpdateAsync(UsuarioCandidato candidato);

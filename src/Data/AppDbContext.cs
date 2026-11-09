@@ -36,6 +36,25 @@ namespace Itajobs_API.src.Data
 
         public DbSet<Candidatura> Candidaturas { get; set; }
 
+        public DbSet<LogFormacao> Formacoes { get; set; }
+
+        public DbSet<LogCurso> Cursos { get; set; }
+
+        public DbSet<CurriculoArquivo> CurriculoArquivos { get; set; }
+
+        public DbSet<AvaliacaoEmpresa> Avaliacoes { get; set; }
+
+        /// <summary>Enums viram texto no banco ("Aberta", "EmAnalise"...), nao numero.</summary>
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            configurationBuilder.Properties<StatusVaga>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<TipoContrato>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<Jornada>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<StatusCandidatura>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<NivelFormacao>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<TipoArquivo>().HaveConversion<string>().HaveMaxLength(10);
+        }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -73,11 +92,18 @@ namespace Itajobs_API.src.Data
             {
                 entidade.ToTable("vaga");
 
+                // A busca publica filtra por status e ordena pela data.
+                entidade.HasIndex(v => new { v.Status, v.DataPublicacao });
+
+                entidade.Property(v => v.DataPublicacao)
+                    .HasColumnType("timestamp without time zone")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                 entidade.HasOne(v => v.Empresa).WithMany(e => e.Vagas)
                     .HasForeignKey(v => v.IdEmpresa).OnDelete(DeleteBehavior.Cascade);
             });
 
-            // 1:1 candidato -> curriculo, e 1:* curriculo -> experiencias/habilidades
+            // 1:1 candidato -> curriculo, e 1:* curriculo -> itens e arquivos
             modelBuilder.Entity<Curriculo>(entidade =>
             {
                 entidade.ToTable("curriculo");
@@ -89,11 +115,44 @@ namespace Itajobs_API.src.Data
                     .HasForeignKey(e => e.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
                 entidade.HasMany(c => c.Habilidades).WithOne()
                     .HasForeignKey(h => h.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasMany(c => c.Formacoes).WithOne()
+                    .HasForeignKey(f => f.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasMany(c => c.Cursos).WithOne()
+                    .HasForeignKey(c => c.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasMany(c => c.Arquivos).WithOne()
+                    .HasForeignKey(a => a.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<LogExperiencia>().ToTable("logs_experiencias");
 
             modelBuilder.Entity<LogHabilidade>().ToTable("logs_habilidades");
+
+            modelBuilder.Entity<LogFormacao>().ToTable("logs_formacoes");
+
+            modelBuilder.Entity<LogCurso>().ToTable("logs_cursos");
+
+            modelBuilder.Entity<CurriculoArquivo>(entidade =>
+            {
+                entidade.ToTable("curriculo_arquivo");
+                entidade.HasKey(a => new { a.IdCurriculo, a.Tipo });
+                entidade.Property(a => a.EnviadoEm).HasColumnType("timestamp without time zone");
+            });
+
+            // *:* empresa <-> candidato (a nota que o candidato deu)
+            modelBuilder.Entity<AvaliacaoEmpresa>(entidade =>
+            {
+                entidade.ToTable("avaliacao_empresa", t => t.HasCheckConstraint("ck_avaliacao_nota", "nota BETWEEN 1 AND 5"));
+                entidade.HasKey(a => new { a.IdEmpresa, a.IdCandidato });
+
+                entidade.Property(a => a.Data)
+                    .HasColumnType("timestamp without time zone")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entidade.HasOne(a => a.Empresa).WithMany(e => e.Avaliacoes)
+                    .HasForeignKey(a => a.IdEmpresa).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasOne(a => a.Candidato).WithMany()
+                    .HasForeignKey(a => a.IdCandidato).OnDelete(DeleteBehavior.Cascade);
+            });
 
             // *:* vaga <-> candidato
             modelBuilder.Entity<Candidatura>(entidade =>
@@ -104,6 +163,7 @@ namespace Itajobs_API.src.Data
                 entidade.Property(c => c.DataCandidatura)
                     .HasColumnType("timestamp without time zone")
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entidade.Property(c => c.DataStatus).HasColumnType("timestamp without time zone");
 
                 entidade.HasOne(c => c.Vaga).WithMany(v => v.Candidaturas)
                     .HasForeignKey(c => c.IdVaga).OnDelete(DeleteBehavior.Cascade);

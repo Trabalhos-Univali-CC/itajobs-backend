@@ -134,6 +134,77 @@ Aplicar as migrations num banco novo:
 dotnet ef database update
 ```
 
+## Autenticacao
+
+JWT. O login devolve um token que vai nas proximas requests no header
+`Authorization: Bearer {token}`.
+
+| Verbo | Rota | Corpo / retorno |
+|---|---|---|
+| POST | `/api/auth/login` | `{ email, senha, tipo: "candidato" \| "empresa" }` → `{ token, expiraEm, usuario }` |
+| GET | `/api/auth/me` | quem esta logado |
+| PUT | `/api/auth/senha` | `{ senhaAtual, novaSenha }` → 204. Unico jeito de trocar a senha |
+
+- **Limite de tentativas:** 5 logins por minuto por IP (`LOGIN_TENTATIVAS_POR_MINUTO`);
+  passou disso, 429. Atras do proxy do Next vale o IP do `X-Forwarded-For`.
+- **Toda rota exige login**, menos as marcadas com `[AllowAnonymous]`: cadastro de
+  candidato e de empresa, login e listagem/detalhe de vagas. Rota nova ja nasce
+  protegida.
+- Cada um so altera os proprios dados; empresas podem ver candidatos e curriculos.
+  As regras de cada controller estao no `<remarks>` dele.
+- A senha e guardada so como hash (PBKDF2, `SenhaHasher`). O e-mail e unico dentro de
+  cada tipo de conta, por isso o login pede o `tipo`.
+- Erros seguem o formato da API: 401 sem login, 403 sem permissao, ambos com
+  `{ "mensagem": "..." }`.
+
+Chaves no `itajobs.env`:
+
+```env
+JWT_SECRET=        # 32+ caracteres aleatorios; trocar invalida todos os logins
+JWT_EXPIRA_HORAS=8
+```
+
+## Endereco: so Itajai/SC
+
+O CEP e obrigatorio e e consultado no ViaCEP. Se nao for de Itajai (codigo IBGE
+4208203), o cadastro e recusado com 400. A cidade sempre vem do CEP; rua e bairro em
+branco tambem. Se o ViaCEP nao responder, a API devolve 503.
+
+## Vagas, candidaturas, avaliacoes e curriculo
+
+Enums trafegam como texto camelCase (`"clt"`, `"meioPeriodo"`, `"emAnalise"`); numero
+e recusado. No banco ficam como texto (`"Clt"`, `"EmAnalise"`).
+
+**Vagas**
+- Campos: `tipoContrato` (clt, pj, estagio, temporario, aprendiz), `jornada` (integral,
+  meioPeriodo, noturno, escala), `bairro` (vazio = bairro da empresa), `requisitos`,
+  `status` e `dataPublicacao`.
+- `GET /api/vaga` e paginado: devolve `{ itens, pagina, tamanhoPagina, total, totalPaginas }`.
+  Filtros: `cargo`, `bairro`, `salarioMinimo`, `salarioMaximo`, `tipoContrato`, `jornada`,
+  `status`, `idEmpresa`, `pagina`, `tamanhoPagina` (ate 100). Sem `status`, so abertas,
+  menos quando filtra por `idEmpresa`.
+- `PATCH /api/vaga/{id}/status` `{ status: "encerrada" | "aberta" }`. Vaga encerrada nao
+  aceita candidatura.
+
+**Candidaturas**
+- Status: recebida → emAnalise → aprovada / recusada, so a empresa dona muda:
+  `PATCH /api/vaga/{idVaga}/candidaturas/{idCandidato}/status`.
+- `GET /api/vaga/{id}/candidaturas?status=emAnalise` filtra.
+
+**Avaliacoes de empresa** (substituem o antigo `PATCH /api/empresa/{id}/nota`)
+- `PUT /api/empresa/{idEmpresa}/avaliacoes/{idCandidato}` `{ nota: 1..5, comentario }`:
+  so quem se candidatou a uma vaga da empresa; avaliar de novo substitui.
+- `GET /api/empresa/{id}/avaliacoes`, `DELETE .../avaliacoes/{idCandidato}`.
+- A `nota` da empresa e a media, com `totalAvaliacoes`.
+
+**Curriculo**
+- `PUT /api/curriculo/{id}` `{ resumo }`.
+- Formacoes e cursos: `POST/PUT/DELETE /api/curriculo/{id}/formacoes[/{idFormacao}]` e
+  `.../cursos[/{idCurso}]`.
+- Arquivos: `PUT /api/curriculo/{id}/arquivos/{pdf|foto}` (multipart, campo `arquivo`),
+  `GET` para baixar, `DELETE`. PDF ate 5 MB; foto JPG/PNG/WebP ate 2 MB. O tipo e
+  conferido pelo conteudo. Ficam no banco (`bytea`), entao saem no backup e no cascade.
+
 ## Rodando
 
 ```bash

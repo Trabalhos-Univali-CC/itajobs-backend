@@ -5,27 +5,23 @@ namespace Itajobs_API.src.Services
 {
     /// <summary>
     /// Conversoes de endereco e contato, usadas por <see cref="EmpresaService"/> e
-    /// <see cref="CandidatoService"/>.
+    /// <see cref="CandidatoService"/>. A entrada do endereco tem regra (CEP de
+    /// Itajai) e fica no <see cref="EnderecoService"/>.
     /// </summary>
     internal static class EnderecoContatoMapper
     {
-        public static void Copiar(EnderecoDTO origem, Endereco destino)
-        {
-            destino.Cidade = origem.Cidade.Trim();
-            destino.Bairro = VazioParaNull(origem.Bairro);
-            destino.Rua = origem.Rua.Trim();
-            destino.Numero = origem.Numero.Trim();
-            destino.Complemento = VazioParaNull(origem.Complemento);
-        }
-
         public static void Copiar(ContatoDTO origem, Contato destino)
         {
-            destino.Email = origem.Email.Trim().ToLowerInvariant();
+            destino.Email = NormalizarEmail(origem.Email);
             destino.Telefone = origem.Telefone.Trim();
         }
 
+        /// <summary>E-mail e guardado e comparado sempre assim.</summary>
+        public static string NormalizarEmail(string email) => email.Trim().ToLowerInvariant();
+
         public static EnderecoDTO ToDTO(Endereco endereco) => new()
         {
+            Cep = endereco.Cep,
             Cidade = endereco.Cidade,
             Bairro = endereco.Bairro,
             Rua = endereco.Rua,
@@ -38,10 +34,5 @@ namespace Itajobs_API.src.Services
             Email = contato.Email,
             Telefone = contato.Telefone
         };
-
-        private static string? VazioParaNull(string? valor)
-        {
-            return string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
-        }
     }
 }

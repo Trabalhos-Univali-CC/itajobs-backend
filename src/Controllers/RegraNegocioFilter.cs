@@ -25,6 +25,9 @@ namespace Itajobs_API.src.Controllers
             {
                 TipoErro.NaoEncontrado => StatusCodes.Status404NotFound,
                 TipoErro.Conflito => StatusCodes.Status409Conflict,
+                TipoErro.NaoAutenticado => StatusCodes.Status401Unauthorized,
+                TipoErro.Proibido => StatusCodes.Status403Forbidden,
+                TipoErro.Indisponivel => StatusCodes.Status503ServiceUnavailable,
                 _ => StatusCodes.Status400BadRequest
             };
 
