@@ -14,5 +14,7 @@ namespace Itajobs_API.src.DTO
         public DateOnly DataInicio { get; set; }
 
         public DateOnly? DataFim { get; set; }
+
+        public string? Descricao { get; set; }
     }
 }

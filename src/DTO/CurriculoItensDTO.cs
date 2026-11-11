@@ -3,12 +3,60 @@ using Itajobs_API.src.Models;
 
 namespace Itajobs_API.src.DTO
 {
-    /// <summary>Corpo do <c>PUT /api/curriculo/{id}</c>.</summary>
+    /// <summary>
+    /// Corpo do <c>PUT /api/curriculo/{id}</c>. Substitui os dois campos: o que vier
+    /// vazio (ou nao vier) e apagado.
+    /// </summary>
     public class CurriculoUpdateDTO
     {
         /// <summary>Resumo profissional. Vazio apaga.</summary>
         [StringLength(2000)]
         public string? Resumo { get; set; }
+
+        /// <summary>Link do portfolio, com http:// ou https://. Vazio apaga.</summary>
+        [StringLength(255)]
+        public string? Portfolio { get; set; }
+    }
+
+    /// <summary>O que a API recebe no POST e no PUT de projeto.</summary>
+    public class ProjetoCreateDTO
+    {
+        [Required(ErrorMessage = "Titulo e obrigatorio.")]
+        [StringLength(100, MinimumLength = 2)]
+        public string Titulo { get; set; } = string.Empty;
+
+        [StringLength(1000)]
+        public string? Descricao { get; set; }
+    }
+
+    public class ProjetoDTO
+    {
+        public int Id { get; set; }
+
+        public string Titulo { get; set; } = string.Empty;
+
+        public string? Descricao { get; set; }
+    }
+
+    /// <summary>O que a API recebe no POST e no PUT de idioma.</summary>
+    public class IdiomaCreateDTO
+    {
+        [Required(ErrorMessage = "Idioma e obrigatorio.")]
+        [StringLength(45, MinimumLength = 2)]
+        public string Idioma { get; set; } = string.Empty;
+
+        /// <summary><c>basico</c>, <c>intermediario</c>, <c>avancado</c>, <c>fluente</c> ou <c>nativo</c>.</summary>
+        [Required(ErrorMessage = "Nivel e obrigatorio.")]
+        public NivelIdioma? Nivel { get; set; }
+    }
+
+    public class IdiomaDTO
+    {
+        public int Id { get; set; }
+
+        public string Idioma { get; set; } = string.Empty;
+
+        public NivelIdioma Nivel { get; set; }
     }
 
     /// <summary>

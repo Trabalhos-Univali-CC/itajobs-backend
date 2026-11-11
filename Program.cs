@@ -1,9 +1,11 @@
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Itajobs_API.src.Controllers;
 using Itajobs_API.src.Data;
@@ -13,6 +15,10 @@ using Itajobs_API.src.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 var env = EnvLoader.Load("itajobs.env");
+
+// Fila de conexoes TCP aguardando aceite. O padrao (512) estoura quando milhares de
+// usuarios conectam no mesmo instante; ai o sistema recusa a conexao.
+builder.WebHost.UseSockets(options => options.Backlog = 4096);
 
 // Controllers e OpenAPI. O filtro transforma RegraNegocioException em 400/401/403/404/409/503.
 // Enums saem e entram como texto camelCase ("emAnalise"); numero nao e aceito.
@@ -63,8 +69,22 @@ builder.Services.AddCors(options =>
 
 // Banco: a connection string vem de Core/Secrets/itajobs.env, nao do
 // appsettings.json - senha nao entra em arquivo versionado.
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Pool de DbContext: reaproveita as instancias em vez de criar uma por request.
+// O tamanho do pool de conexoes fica na connection string (DB_POOL_MAX).
+builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(EnvLoader.BuildConnectionString()));
+
+// Cache em memoria: guarda as consultas de CEP (ver ViaCepService).
+builder.Services.AddMemoryCache();
+
+// Compressao das respostas JSON (listas de vagas, curriculos). Menos banda por request.
+builder.Services.AddResponseCompression(options =>
+{
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Fastest);
 
 // JWT: o segredo vem de JWT_SECRET no itajobs.env. Sem ele a API nem sobe.
 var jwt = JwtOptions.Criar(
@@ -135,6 +155,8 @@ var app = builder.Build();
 
 // Primeiro de tudo: o resto do pipeline (rate limiting inclusive) ja ve o IP real.
 app.UseForwardedHeaders();
+
+app.UseResponseCompression();
 
 if (app.Environment.IsDevelopment())
 {

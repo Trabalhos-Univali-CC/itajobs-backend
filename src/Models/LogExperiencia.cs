@@ -29,5 +29,10 @@ namespace Itajobs_API.src.Models
         /// <summary><c>null</c> = emprego atual.</summary>
         [Column("data_fim")]
         public DateOnly? DataFim { get; set; }
+
+        /// <summary>O que fazia no cargo.</summary>
+        [MaxLength(1000)]
+        [Column("descricao")]
+        public string? Descricao { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Itajobs_API.src.Services
 {
@@ -21,16 +22,43 @@ namespace Itajobs_API.src.Services
     /// <see cref="ICepService"/> pelo ViaCEP (viacep.com.br). O HttpClient vem
     /// configurado do <c>Program.cs</c>.
     /// </summary>
+    /// <remarks>
+    /// As respostas ficam em cache: CEP quase nunca muda, e o ViaCEP bloqueia quem
+    /// consulta demais. CEP encontrado fica 24 h; inexistente, 1 h. Falha de rede nao
+    /// entra no cache.
+    /// </remarks>
     public class ViaCepService : ICepService
     {
-        private readonly HttpClient _http;
+        private static readonly TimeSpan TempoEncontrado = TimeSpan.FromHours(24);
+        private static readonly TimeSpan TempoInexistente = TimeSpan.FromHours(1);
 
-        public ViaCepService(HttpClient http)
+        /// <summary>Marca "CEP nao existe" no cache (o cache nao guarda <c>null</c> como resposta).</summary>
+        private static readonly CepInfo Inexistente = new("", "", "", "", "", "");
+
+        private readonly HttpClient _http;
+        private readonly IMemoryCache _cache;
+
+        public ViaCepService(HttpClient http, IMemoryCache cache)
         {
             _http = http;
+            _cache = cache;
         }
 
         public async Task<CepInfo?> ConsultarAsync(string cep)
+        {
+            var chave = $"cep:{cep}";
+            if (_cache.TryGetValue(chave, out CepInfo? guardado))
+            {
+                return ReferenceEquals(guardado, Inexistente) ? null : guardado;
+            }
+
+            var info = await ConsultarViaCepAsync(cep);
+
+            _cache.Set(chave, info ?? Inexistente, info is null ? TempoInexistente : TempoEncontrado);
+            return info;
+        }
+
+        private async Task<CepInfo?> ConsultarViaCepAsync(string cep)
         {
             JsonElement json;
             try

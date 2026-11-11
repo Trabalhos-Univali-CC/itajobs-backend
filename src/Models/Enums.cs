@@ -46,6 +46,15 @@ namespace Itajobs_API.src.Models
         PosGraduacao
     }
 
+    public enum NivelIdioma
+    {
+        Basico,
+        Intermediario,
+        Avancado,
+        Fluente,
+        Nativo
+    }
+
     /// <summary>Os arquivos que um curriculo pode ter: um de cada.</summary>
     public enum TipoArquivo
     {

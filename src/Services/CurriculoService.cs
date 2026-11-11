@@ -14,7 +14,8 @@ namespace Itajobs_API.src.Services
     /// <item>Experiencia: inicio e fim nao ficam no futuro, e o fim nao vem antes do inicio.</item>
     /// <item>Formacao: inicio nao fica no futuro; o fim pode (previsao), mas nao vem antes do inicio.</item>
     /// <item>Curso: a conclusao nao fica no futuro.</item>
-    /// <item>Habilidade nao se repete no mesmo curriculo (sem diferenciar maiuscula).</item>
+    /// <item>Habilidade e idioma nao se repetem no mesmo curriculo (sem diferenciar maiuscula).</item>
+    /// <item>Portfolio, quando informado, e um link http/https.</item>
     /// <item>Um PDF (ate 5 MB) e uma foto JPG/PNG/WebP (ate 2 MB). O tipo e conferido pelo
     /// conteudo do arquivo, nao pelo nome nem pelo content-type que o cliente mandou.</item>
     /// <item>Apagar o curriculo apaga itens e arquivos.</item>
@@ -39,6 +40,9 @@ namespace Itajobs_API.src.Services
             var curriculo = await _repository.GetByIdAsync(id);
             return curriculo is null ? null : await MontarDTOAsync(curriculo);
         }
+
+        /// <summary>O candidato dono do curriculo. <c>null</c> = curriculo nao encontrado.</summary>
+        public Task<int?> GetDonoAsync(int id) => _repository.GetIdCandidatoAsync(id);
 
         public async Task<CurriculoDTO?> GetByCandidatoAsync(int idCandidato)
         {
@@ -79,6 +83,7 @@ namespace Itajobs_API.src.Services
             }
 
             curriculo.Resumo = VazioParaNull(dto.Resumo);
+            curriculo.Portfolio = ValidarPortfolio(dto.Portfolio);
             await _repository.UpdateAsync(curriculo);
             return await MontarDTOAsync(curriculo);
         }
@@ -270,6 +275,137 @@ namespace Itajobs_API.src.Services
             return true;
         }
 
+        /// <summary><c>null</c> = curriculo nao encontrado.</summary>
+        public async Task<ProjetoDTO?> AddProjetoAsync(int idCurriculo, ProjetoCreateDTO dto)
+        {
+            if (await _repository.GetByIdAsync(idCurriculo) is null)
+            {
+                return null;
+            }
+
+            var projeto = new LogProjeto { IdCurriculo = idCurriculo };
+            Copiar(dto, projeto);
+
+            var criado = await _repository.AddProjetoAsync(projeto);
+            return ToDTO(criado);
+        }
+
+        /// <summary><c>null</c> = projeto nao encontrado neste curriculo.</summary>
+        public async Task<ProjetoDTO?> UpdateProjetoAsync(int idCurriculo, int idProjeto, ProjetoCreateDTO dto)
+        {
+            var projeto = await _repository.GetProjetoAsync(idCurriculo, idProjeto);
+            if (projeto is null)
+            {
+                return null;
+            }
+
+            Copiar(dto, projeto);
+
+            await _repository.UpdateProjetoAsync(projeto);
+            return ToDTO(projeto);
+        }
+
+        public async Task<bool> DeleteProjetoAsync(int idCurriculo, int idProjeto)
+        {
+            var projeto = await _repository.GetProjetoAsync(idCurriculo, idProjeto);
+            if (projeto is null)
+            {
+                return false;
+            }
+
+            await _repository.DeleteProjetoAsync(projeto);
+            return true;
+        }
+
+        /// <summary><c>null</c> = curriculo nao encontrado.</summary>
+        public async Task<IdiomaDTO?> AddIdiomaAsync(int idCurriculo, IdiomaCreateDTO dto)
+        {
+            var nome = NomeDoIdioma(dto.Idioma);
+
+            if (await _repository.GetByIdAsync(idCurriculo) is null)
+            {
+                return null;
+            }
+
+            await ExigirIdiomaNovoAsync(idCurriculo, nome, null);
+
+            var criado = await _repository.AddIdiomaAsync(
+                new LogIdioma { IdCurriculo = idCurriculo, Idioma = nome, Nivel = dto.Nivel!.Value });
+            return ToDTO(criado);
+        }
+
+        /// <summary><c>null</c> = idioma nao encontrado neste curriculo.</summary>
+        public async Task<IdiomaDTO?> UpdateIdiomaAsync(int idCurriculo, int idIdioma, IdiomaCreateDTO dto)
+        {
+            var nome = NomeDoIdioma(dto.Idioma);
+
+            var idioma = await _repository.GetIdiomaAsync(idCurriculo, idIdioma);
+            if (idioma is null)
+            {
+                return null;
+            }
+
+            await ExigirIdiomaNovoAsync(idCurriculo, nome, idIdioma);
+
+            idioma.Idioma = nome;
+            idioma.Nivel = dto.Nivel!.Value;
+
+            await _repository.UpdateIdiomaAsync(idioma);
+            return ToDTO(idioma);
+        }
+
+        public async Task<bool> DeleteIdiomaAsync(int idCurriculo, int idIdioma)
+        {
+            var idioma = await _repository.GetIdiomaAsync(idCurriculo, idIdioma);
+            if (idioma is null)
+            {
+                return false;
+            }
+
+            await _repository.DeleteIdiomaAsync(idioma);
+            return true;
+        }
+
+        private static string NomeDoIdioma(string idioma)
+        {
+            var nome = idioma.Trim();
+            if (nome.Length < 2)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido, "O nome do idioma precisa ter ao menos 2 letras.");
+            }
+
+            return nome;
+        }
+
+        private async Task ExigirIdiomaNovoAsync(int idCurriculo, string idioma, int? ignorarId)
+        {
+            if (await _repository.IdiomaExisteAsync(idCurriculo, idioma, ignorarId))
+            {
+                throw new RegraNegocioException(TipoErro.Conflito,
+                    $"O idioma \"{idioma}\" ja esta neste curriculo.");
+            }
+        }
+
+        /// <summary>Vazio = sem portfolio. Senao, precisa ser um link http/https completo.</summary>
+        private static string? ValidarPortfolio(string? portfolio)
+        {
+            var link = VazioParaNull(portfolio);
+            if (link is null)
+            {
+                return null;
+            }
+
+            if (!Uri.TryCreate(link, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(uri.Host))
+            {
+                throw new RegraNegocioException(TipoErro.Invalido,
+                    "O portfolio precisa ser um link comecando com http:// ou https://.");
+            }
+
+            return link;
+        }
+
         /// <summary>Cria ou substitui o arquivo do tipo. <c>null</c> = curriculo nao encontrado.</summary>
         public async Task<ArquivoDTO?> SalvarArquivoAsync(int idCurriculo, TipoArquivo tipo, string nomeOriginal, byte[] conteudo)
         {
@@ -426,6 +562,13 @@ namespace Itajobs_API.src.Services
             experiencia.NomeEmpresa = string.IsNullOrWhiteSpace(dto.NomeEmpresa) ? null : dto.NomeEmpresa.Trim();
             experiencia.DataInicio = dto.DataInicio!.Value;
             experiencia.DataFim = dto.DataFim;
+            experiencia.Descricao = VazioParaNull(dto.Descricao);
+        }
+
+        private static void Copiar(ProjetoCreateDTO dto, LogProjeto projeto)
+        {
+            projeto.Titulo = dto.Titulo.Trim();
+            projeto.Descricao = VazioParaNull(dto.Descricao);
         }
 
         private static void Copiar(FormacaoCreateDTO dto, LogFormacao formacao)
@@ -457,10 +600,13 @@ namespace Itajobs_API.src.Services
             IdCandidato = curriculo.IdCandidato,
             NomeCandidato = $"{curriculo.Candidato.Nome} {curriculo.Candidato.Sobrenome}",
             Resumo = curriculo.Resumo,
+            Portfolio = curriculo.Portfolio,
             Experiencias = curriculo.Experiencias.Select(ToDTO).ToList(),
             Habilidades = curriculo.Habilidades.Select(ToDTO).ToList(),
             Formacoes = curriculo.Formacoes.Select(ToDTO).ToList(),
             Cursos = curriculo.Cursos.Select(ToDTO).ToList(),
+            Projetos = curriculo.Projetos.Select(ToDTO).ToList(),
+            Idiomas = curriculo.Idiomas.Select(ToDTO).ToList(),
             Arquivos = (await _repository.GetArquivosSemConteudoAsync(curriculo.Id)).Select(ToDTO).ToList()
         };
 
@@ -498,7 +644,22 @@ namespace Itajobs_API.src.Services
             Cargo = experiencia.Cargo,
             NomeEmpresa = experiencia.NomeEmpresa,
             DataInicio = experiencia.DataInicio,
-            DataFim = experiencia.DataFim
+            DataFim = experiencia.DataFim,
+            Descricao = experiencia.Descricao
+        };
+
+        private static ProjetoDTO ToDTO(LogProjeto projeto) => new()
+        {
+            Id = projeto.Id,
+            Titulo = projeto.Titulo,
+            Descricao = projeto.Descricao
+        };
+
+        private static IdiomaDTO ToDTO(LogIdioma idioma) => new()
+        {
+            Id = idioma.Id,
+            Idioma = idioma.Idioma,
+            Nivel = idioma.Nivel
         };
 
         private static HabilidadeDTO ToDTO(LogHabilidade habilidade) => new()

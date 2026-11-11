@@ -40,6 +40,10 @@ namespace Itajobs_API.src.Data
 
         public DbSet<LogCurso> Cursos { get; set; }
 
+        public DbSet<LogProjeto> Projetos { get; set; }
+
+        public DbSet<LogIdioma> Idiomas { get; set; }
+
         public DbSet<CurriculoArquivo> CurriculoArquivos { get; set; }
 
         public DbSet<AvaliacaoEmpresa> Avaliacoes { get; set; }
@@ -52,6 +56,7 @@ namespace Itajobs_API.src.Data
             configurationBuilder.Properties<Jornada>().HaveConversion<string>().HaveMaxLength(20);
             configurationBuilder.Properties<StatusCandidatura>().HaveConversion<string>().HaveMaxLength(20);
             configurationBuilder.Properties<NivelFormacao>().HaveConversion<string>().HaveMaxLength(20);
+            configurationBuilder.Properties<NivelIdioma>().HaveConversion<string>().HaveMaxLength(20);
             configurationBuilder.Properties<TipoArquivo>().HaveConversion<string>().HaveMaxLength(10);
         }
 
@@ -61,7 +66,13 @@ namespace Itajobs_API.src.Data
 
             // Nomes de tabela e regras de FK iguais ao "tabelas itajobs ver2.sql" do
             // itajobs-banco. Os nomes das colunas estao nos [Column] dos Models.
-            modelBuilder.Entity<Contato>().ToTable("contato");
+            // O login e o cadastro procuram o usuario pelo e-mail. Sem indice, cada
+            // busca le a tabela inteira. Nao e unico: candidato e empresa podem repetir.
+            modelBuilder.Entity<Contato>(entidade =>
+            {
+                entidade.ToTable("contato");
+                entidade.HasIndex(c => c.Email);
+            });
 
             modelBuilder.Entity<Endereco>().ToTable("endereco");
 
@@ -119,6 +130,10 @@ namespace Itajobs_API.src.Data
                     .HasForeignKey(f => f.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
                 entidade.HasMany(c => c.Cursos).WithOne()
                     .HasForeignKey(c => c.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasMany(c => c.Projetos).WithOne()
+                    .HasForeignKey(p => p.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
+                entidade.HasMany(c => c.Idiomas).WithOne()
+                    .HasForeignKey(i => i.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
                 entidade.HasMany(c => c.Arquivos).WithOne()
                     .HasForeignKey(a => a.IdCurriculo).OnDelete(DeleteBehavior.Cascade);
             });
@@ -130,6 +145,10 @@ namespace Itajobs_API.src.Data
             modelBuilder.Entity<LogFormacao>().ToTable("logs_formacoes");
 
             modelBuilder.Entity<LogCurso>().ToTable("logs_cursos");
+
+            modelBuilder.Entity<LogProjeto>().ToTable("logs_projetos");
+
+            modelBuilder.Entity<LogIdioma>().ToTable("logs_idiomas");
 
             modelBuilder.Entity<CurriculoArquivo>(entidade =>
             {

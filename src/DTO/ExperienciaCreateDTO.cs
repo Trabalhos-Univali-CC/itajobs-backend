@@ -20,5 +20,9 @@ namespace Itajobs_API.src.DTO
 
         /// <summary>Vazio = emprego atual.</summary>
         public DateOnly? DataFim { get; set; }
+
+        /// <summary>O que fazia no cargo.</summary>
+        [StringLength(1000)]
+        public string? Descricao { get; set; }
     }
 }

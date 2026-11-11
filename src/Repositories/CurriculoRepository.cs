@@ -18,6 +18,14 @@ namespace Itajobs_API.src.Repositories
             return await ComItens().FirstOrDefaultAsync(c => c.Id == id);
         }
 
+        public async Task<int?> GetIdCandidatoAsync(int id)
+        {
+            return await _context.Curriculos.AsNoTracking()
+                .Where(c => c.Id == id)
+                .Select(c => (int?)c.IdCandidato)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<Curriculo?> GetByCandidatoAsync(int idCandidato)
         {
             return await ComItens().FirstOrDefaultAsync(c => c.IdCandidato == idCandidato);
@@ -144,6 +152,65 @@ namespace Itajobs_API.src.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task<LogProjeto?> GetProjetoAsync(int idCurriculo, int idProjeto)
+        {
+            return await _context.Projetos
+                .FirstOrDefaultAsync(p => p.Id == idProjeto && p.IdCurriculo == idCurriculo);
+        }
+
+        public async Task<LogProjeto> AddProjetoAsync(LogProjeto projeto)
+        {
+            _context.Projetos.Add(projeto);
+            await _context.SaveChangesAsync();
+            return projeto;
+        }
+
+        public async Task UpdateProjetoAsync(LogProjeto projeto)
+        {
+            _context.Projetos.Update(projeto);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteProjetoAsync(LogProjeto projeto)
+        {
+            _context.Projetos.Remove(projeto);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<LogIdioma?> GetIdiomaAsync(int idCurriculo, int idIdioma)
+        {
+            return await _context.Idiomas
+                .FirstOrDefaultAsync(i => i.Id == idIdioma && i.IdCurriculo == idCurriculo);
+        }
+
+        public async Task<bool> IdiomaExisteAsync(int idCurriculo, string idioma, int? ignorarId = null)
+        {
+            var normalizado = idioma.ToLower();
+            return await _context.Idiomas.AnyAsync(i =>
+                i.IdCurriculo == idCurriculo
+                && i.Idioma.ToLower() == normalizado
+                && (ignorarId == null || i.Id != ignorarId));
+        }
+
+        public async Task<LogIdioma> AddIdiomaAsync(LogIdioma idioma)
+        {
+            _context.Idiomas.Add(idioma);
+            await _context.SaveChangesAsync();
+            return idioma;
+        }
+
+        public async Task UpdateIdiomaAsync(LogIdioma idioma)
+        {
+            _context.Idiomas.Update(idioma);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteIdiomaAsync(LogIdioma idioma)
+        {
+            _context.Idiomas.Remove(idioma);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<List<CurriculoArquivo>> GetArquivosSemConteudoAsync(int idCurriculo)
         {
             // Projecao: o SELECT nao traz a coluna "conteudo".
@@ -201,7 +268,10 @@ namespace Itajobs_API.src.Repositories
                 .Include(c => c.Experiencias.OrderByDescending(e => e.DataInicio))
                 .Include(c => c.Habilidades.OrderBy(h => h.Descricao))
                 .Include(c => c.Formacoes.OrderByDescending(f => f.DataInicio))
-                .Include(c => c.Cursos.OrderByDescending(c => c.DataConclusao));
+                .Include(c => c.Cursos.OrderByDescending(c => c.DataConclusao))
+                .Include(c => c.Projetos.OrderBy(p => p.Id))
+                .Include(c => c.Idiomas.OrderBy(i => i.Idioma))
+                .AsSplitQuery();
         }
     }
 }

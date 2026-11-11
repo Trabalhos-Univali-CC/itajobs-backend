@@ -8,7 +8,7 @@ namespace Itajobs_API.src.Controllers
 {
     /// <summary>
     /// Rotas de curriculo e dos itens dele (experiencias, habilidades, formacoes,
-    /// cursos) e dos arquivos (PDF e foto).
+    /// cursos, projetos, idiomas) e dos arquivos (PDF e foto).
     /// </summary>
     /// <remarks>
     /// Acesso: ver e baixar arquivos, o dono ou uma empresa; criar, alterar, apagar e
@@ -280,6 +280,102 @@ namespace Itajobs_API.src.Controllers
             return NoContent();
         }
 
+        /// <summary>POST /api/curriculo/5/projetos</summary>
+        [HttpPost("{id:int}/projetos")]
+        public async Task<IActionResult> AddProjeto(int id, [FromBody] ProjetoCreateDTO dto)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            var criado = await _service.AddProjetoAsync(id, dto);
+            return CreatedAtAction(nameof(GetById), new { id }, criado);
+        }
+
+        /// <summary>PUT /api/curriculo/5/projetos/2</summary>
+        [HttpPut("{id:int}/projetos/{idProjeto:int}")]
+        public async Task<IActionResult> UpdateProjeto(int id, int idProjeto, [FromBody] ProjetoCreateDTO dto)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            var atualizado = await _service.UpdateProjetoAsync(id, idProjeto, dto);
+            if (atualizado is null)
+            {
+                return NotFound(new { mensagem = $"Projeto {idProjeto} nao encontrado no curriculo {id}." });
+            }
+
+            return Ok(atualizado);
+        }
+
+        /// <summary>DELETE /api/curriculo/5/projetos/2</summary>
+        [HttpDelete("{id:int}/projetos/{idProjeto:int}")]
+        public async Task<IActionResult> DeleteProjeto(int id, int idProjeto)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            if (!await _service.DeleteProjetoAsync(id, idProjeto))
+            {
+                return NotFound(new { mensagem = $"Projeto {idProjeto} nao encontrado no curriculo {id}." });
+            }
+
+            return NoContent();
+        }
+
+        /// <summary>POST /api/curriculo/5/idiomas</summary>
+        [HttpPost("{id:int}/idiomas")]
+        public async Task<IActionResult> AddIdioma(int id, [FromBody] IdiomaCreateDTO dto)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            var criado = await _service.AddIdiomaAsync(id, dto);
+            return CreatedAtAction(nameof(GetById), new { id }, criado);
+        }
+
+        /// <summary>PUT /api/curriculo/5/idiomas/2</summary>
+        [HttpPut("{id:int}/idiomas/{idIdioma:int}")]
+        public async Task<IActionResult> UpdateIdioma(int id, int idIdioma, [FromBody] IdiomaCreateDTO dto)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            var atualizado = await _service.UpdateIdiomaAsync(id, idIdioma, dto);
+            if (atualizado is null)
+            {
+                return NotFound(new { mensagem = $"Idioma {idIdioma} nao encontrado no curriculo {id}." });
+            }
+
+            return Ok(atualizado);
+        }
+
+        /// <summary>DELETE /api/curriculo/5/idiomas/2</summary>
+        [HttpDelete("{id:int}/idiomas/{idIdioma:int}")]
+        public async Task<IActionResult> DeleteIdioma(int id, int idIdioma)
+        {
+            if (await ExigirDonoAsync(id) is { } naoEncontrado)
+            {
+                return naoEncontrado;
+            }
+
+            if (!await _service.DeleteIdiomaAsync(id, idIdioma))
+            {
+                return NotFound(new { mensagem = $"Idioma {idIdioma} nao encontrado no curriculo {id}." });
+            }
+
+            return NoContent();
+        }
+
         /// <summary>
         /// PUT /api/curriculo/5/arquivos/pdf (ou /foto), multipart/form-data com o campo
         /// <c>arquivo</c>. Substitui o anterior do mesmo tipo.
@@ -308,14 +404,14 @@ namespace Itajobs_API.src.Controllers
         [HttpGet("{id:int}/arquivos/{tipo}")]
         public async Task<IActionResult> BaixarArquivo(int id, TipoArquivo tipo)
         {
-            var curriculo = await _service.GetByIdAsync(id);
-            if (curriculo is null)
+            var dono = await _service.GetDonoAsync(id);
+            if (dono is null)
             {
                 return NotFound(new { mensagem = $"Curriculo {id} nao encontrado." });
             }
 
             var usuario = User.Usuario();
-            UsuarioLogado.Exigir(usuario.EhCandidato(curriculo.IdCandidato) || usuario.EhAlgumaEmpresa);
+            UsuarioLogado.Exigir(usuario.EhCandidato(dono.Value) || usuario.EhAlgumaEmpresa);
 
             var arquivo = await _service.GetArquivoAsync(id, tipo);
             if (arquivo is null)
@@ -350,13 +446,14 @@ namespace Itajobs_API.src.Controllers
         /// <summary>404 se o curriculo nao existe; 403 (via excecao) se e de outro candidato.</summary>
         private async Task<IActionResult?> ExigirDonoAsync(int id)
         {
-            var curriculo = await _service.GetByIdAsync(id);
-            if (curriculo is null)
+            // Consulta leve: so o id do dono, sem carregar os itens do curriculo.
+            var dono = await _service.GetDonoAsync(id);
+            if (dono is null)
             {
                 return NotFound(new { mensagem = $"Curriculo {id} nao encontrado." });
             }
 
-            UsuarioLogado.Exigir(User.Usuario().EhCandidato(curriculo.IdCandidato));
+            UsuarioLogado.Exigir(User.Usuario().EhCandidato(dono.Value));
             return null;
         }
     }

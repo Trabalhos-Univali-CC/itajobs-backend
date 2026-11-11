@@ -14,6 +14,8 @@ namespace Itajobs_API.src.DTO
 
         public string? Resumo { get; set; }
 
+        public string? Portfolio { get; set; }
+
         public List<ExperienciaDTO> Experiencias { get; set; } = [];
 
         public List<HabilidadeDTO> Habilidades { get; set; } = [];
@@ -21,6 +23,10 @@ namespace Itajobs_API.src.DTO
         public List<FormacaoDTO> Formacoes { get; set; } = [];
 
         public List<CursoDTO> Cursos { get; set; } = [];
+
+        public List<ProjetoDTO> Projetos { get; set; } = [];
+
+        public List<IdiomaDTO> Idiomas { get; set; } = [];
 
         public List<ArquivoDTO> Arquivos { get; set; } = [];
     }

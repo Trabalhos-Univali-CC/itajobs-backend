@@ -113,6 +113,8 @@ namespace Itajobs_API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email");
+
                     b.ToTable("contato", (string)null);
                 });
 
@@ -128,6 +130,11 @@ namespace Itajobs_API.Migrations
                     b.Property<int>("IdCandidato")
                         .HasColumnType("integer")
                         .HasColumnName("id_candidato");
+
+                    b.Property<string>("Portfolio")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("portfolio");
 
                     b.Property<string>("Resumo")
                         .HasColumnType("text")
@@ -292,6 +299,11 @@ namespace Itajobs_API.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_inicio");
 
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descricao");
+
                     b.Property<int>("IdCurriculo")
                         .HasColumnType("integer")
                         .HasColumnName("id_curriculo");
@@ -377,6 +389,69 @@ namespace Itajobs_API.Migrations
                     b.HasIndex("IdCurriculo");
 
                     b.ToTable("logs_habilidades", (string)null);
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.LogIdioma", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("IdCurriculo")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_curriculo");
+
+                    b.Property<string>("Idioma")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("idioma");
+
+                    b.Property<string>("Nivel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("nivel");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCurriculo");
+
+                    b.ToTable("logs_idiomas", (string)null);
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.LogProjeto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descricao");
+
+                    b.Property<int>("IdCurriculo")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_curriculo");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("titulo");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCurriculo");
+
+                    b.ToTable("logs_projetos", (string)null);
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.UsuarioCandidato", b =>
@@ -647,6 +722,24 @@ namespace Itajobs_API.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.LogIdioma", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.Curriculo", null)
+                        .WithMany("Idiomas")
+                        .HasForeignKey("IdCurriculo")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.LogProjeto", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.Curriculo", null)
+                        .WithMany("Projetos")
+                        .HasForeignKey("IdCurriculo")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.UsuarioCandidato", b =>
                 {
                     b.HasOne("Itajobs_API.src.Models.Contato", "Contato")
@@ -707,6 +800,10 @@ namespace Itajobs_API.Migrations
                     b.Navigation("Formacoes");
 
                     b.Navigation("Habilidades");
+
+                    b.Navigation("Idiomas");
+
+                    b.Navigation("Projetos");
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.UsuarioCandidato", b =>

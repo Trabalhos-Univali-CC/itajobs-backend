@@ -91,7 +91,14 @@ namespace Itajobs_API.src.Utils
                    $"Password={Get(env, "DB_PASSWORD")};" +
                    // Fuso da sessao: os DEFAULT CURRENT_TIMESTAMP saem no horario de
                    // Itajai, nao no fuso com que o Postgres foi instalado.
-                   $"Timezone={Get(env, "DB_TIMEZONE", "America/Sao_Paulo")}";
+                   $"Timezone={Get(env, "DB_TIMEZONE", "America/Sao_Paulo")};" +
+                   // Pool de conexoes. Fica abaixo do max_connections do Postgres (100
+                   // por padrao), deixando folga para pgAdmin e migrations. Com o pool
+                   // cheio, a request espera uma conexao livre ate o Timeout.
+                   $"Maximum Pool Size={Get(env, "DB_POOL_MAX", "80")};" +
+                   $"Minimum Pool Size={Get(env, "DB_POOL_MIN", "10")};" +
+                   $"Timeout={Get(env, "DB_POOL_ESPERA_SEGUNDOS", "30")};" +
+                   "Command Timeout=30";
         }
     }
 }

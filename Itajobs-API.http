@@ -1,4 +1,4 @@
-@host = http://localhost:5176
+@host = http://localhost:8080
 
 ### Cadastrar candidato (publico). CEP precisa ser de Itajai/SC; rua e bairro
 ### em branco vem do ViaCEP.
