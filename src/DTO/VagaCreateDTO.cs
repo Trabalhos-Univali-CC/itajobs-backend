@@ -19,9 +19,27 @@ namespace Itajobs_API.src.DTO
         [Required(ErrorMessage = "Descricao e obrigatoria.")]
         public string Descricao { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Salario fixo. Remuneracao: nada ("a combinar"), so <c>salario</c>, ou
+        /// <c>salarioMinimo</c> + <c>salarioMaximo</c> (faixa). Nunca fixo e faixa juntos.
+        /// </summary>
+        [Range(0.01, 99_999_999.99, ErrorMessage = "Salario vai de 0,01 a 99.999.999,99.")]
         public decimal? Salario { get; set; }
 
-        /// <summary><c>clt</c>, <c>pj</c>, <c>estagio</c>, <c>temporario</c> ou <c>aprendiz</c>.</summary>
+        [Range(0.01, 99_999_999.99, ErrorMessage = "SalarioMinimo vai de 0,01 a 99.999.999,99.")]
+        public decimal? SalarioMinimo { get; set; }
+
+        [Range(0.01, 99_999_999.99, ErrorMessage = "SalarioMaximo vai de 0,01 a 99.999.999,99.")]
+        public decimal? SalarioMaximo { get; set; }
+
+        /// <summary><c>presencial</c>, <c>hibrido</c> ou <c>remoto</c>. Opcional.</summary>
+        public Modalidade? Modalidade { get; set; }
+
+        /// <summary>Termos para a busca. Repetidas (sem diferenciar maiuscula) entram uma vez so.</summary>
+        [MaxLength(20, ErrorMessage = "No maximo 20 palavras-chave.")]
+        public List<string>? PalavrasChave { get; set; }
+
+        /// <summary><c>clt</c>, <c>pj</c>, <c>estagio</c>, <c>temporario</c>, <c>aprendiz</c> ou <c>diaria</c>.</summary>
         [Required(ErrorMessage = "TipoContrato e obrigatorio.")]
         public TipoContrato? TipoContrato { get; set; }
 

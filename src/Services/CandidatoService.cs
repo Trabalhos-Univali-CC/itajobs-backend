@@ -11,7 +11,7 @@ namespace Itajobs_API.src.Services
     /// <list type="bullet">
     /// <item>CPF e guardado sem mascara e precisa ter digitos verificadores validos.</item>
     /// <item>CPF nao se repete entre candidatos.</item>
-    /// <item>E-mail nao se repete entre candidatos (uma empresa pode usar o mesmo).</item>
+    /// <item>E-mail nao se repete entre nenhuma conta, de candidato ou de empresa.</item>
     /// <item>Senha obrigatoria no cadastro; guardada so como hash. Depois so muda pelo <c>PUT /api/auth/senha</c>.</item>
     /// <item>O endereco precisa ser de Itajai/SC (ver <see cref="EnderecoService"/>).</item>
     /// <item>Apagar o candidato apaga endereco, contato, curriculo e candidaturas.</item>
@@ -20,11 +20,16 @@ namespace Itajobs_API.src.Services
     public class CandidatoService
     {
         private readonly ICandidatoRepository _repository;
+        private readonly IEmpresaRepository _empresaRepository;
         private readonly EnderecoService _enderecoService;
 
-        public CandidatoService(ICandidatoRepository repository, EnderecoService enderecoService)
+        public CandidatoService(
+            ICandidatoRepository repository,
+            IEmpresaRepository empresaRepository,
+            EnderecoService enderecoService)
         {
             _repository = repository;
+            _empresaRepository = empresaRepository;
             _enderecoService = enderecoService;
         }
 
@@ -117,9 +122,12 @@ namespace Itajobs_API.src.Services
 
         private async Task ValidarEmailAsync(string email, int? ignorarId)
         {
-            if (await _repository.EmailExisteAsync(EnderecoContatoMapper.NormalizarEmail(email), ignorarId))
+            var normalizado = EnderecoContatoMapper.NormalizarEmail(email);
+
+            if (await _repository.EmailExisteAsync(normalizado, ignorarId)
+                || await _empresaRepository.EmailExisteAsync(normalizado))
             {
-                throw new RegraNegocioException(TipoErro.Conflito, "Ja existe um candidato com este e-mail.");
+                throw new RegraNegocioException(TipoErro.Conflito, "Este e-mail ja esta em uso por outra conta.");
             }
         }
 

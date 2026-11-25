@@ -32,6 +32,11 @@ namespace Itajobs_API.src.Repositories
                 .FirstOrDefaultAsync(e => e.Id == id);
         }
 
+        public async Task<bool> ExisteAsync(int id)
+        {
+            return await _context.Empresas.AnyAsync(e => e.Id == id);
+        }
+
         public async Task<bool> CnpjExisteAsync(string cnpj, int? ignorarId = null)
         {
             return await _context.Empresas.AnyAsync(e => e.Cnpj == cnpj && e.Id != ignorarId);

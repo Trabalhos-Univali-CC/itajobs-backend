@@ -82,8 +82,9 @@ namespace Itajobs_API.src.Services
                 return null;
             }
 
+            curriculo.TituloProfissional = VazioParaNull(dto.TituloProfissional);
             curriculo.Resumo = VazioParaNull(dto.Resumo);
-            curriculo.Portfolio = ValidarPortfolio(dto.Portfolio);
+            curriculo.Portfolio = Link.Validar(dto.Portfolio, "portfolio");
             await _repository.UpdateAsync(curriculo);
             return await MontarDTOAsync(curriculo);
         }
@@ -386,26 +387,6 @@ namespace Itajobs_API.src.Services
             }
         }
 
-        /// <summary>Vazio = sem portfolio. Senao, precisa ser um link http/https completo.</summary>
-        private static string? ValidarPortfolio(string? portfolio)
-        {
-            var link = VazioParaNull(portfolio);
-            if (link is null)
-            {
-                return null;
-            }
-
-            if (!Uri.TryCreate(link, UriKind.Absolute, out var uri)
-                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-                || string.IsNullOrEmpty(uri.Host))
-            {
-                throw new RegraNegocioException(TipoErro.Invalido,
-                    "O portfolio precisa ser um link comecando com http:// ou https://.");
-            }
-
-            return link;
-        }
-
         /// <summary>Cria ou substitui o arquivo do tipo. <c>null</c> = curriculo nao encontrado.</summary>
         public async Task<ArquivoDTO?> SalvarArquivoAsync(int idCurriculo, TipoArquivo tipo, string nomeOriginal, byte[] conteudo)
         {
@@ -474,22 +455,8 @@ namespace Itajobs_API.src.Services
                 throw new RegraNegocioException(TipoErro.Invalido, "A foto pode ter no maximo 2 MB.");
             }
 
-            if (ComecaCom(conteudo, [0xFF, 0xD8, 0xFF]))
-            {
-                return "image/jpeg";
-            }
-
-            if (ComecaCom(conteudo, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
-            {
-                return "image/png";
-            }
-
-            if (conteudo.Length >= 12 && ComecaCom(conteudo, "RIFF"u8) && conteudo.AsSpan(8, 4).SequenceEqual("WEBP"u8))
-            {
-                return "image/webp";
-            }
-
-            throw new RegraNegocioException(TipoErro.Invalido, "A foto precisa ser JPG, PNG ou WebP.");
+            return Imagem.DetectarContentType(conteudo)
+                ?? throw new RegraNegocioException(TipoErro.Invalido, "A foto precisa ser JPG, PNG ou WebP.");
         }
 
         private static bool ComecaCom(byte[] conteudo, ReadOnlySpan<byte> assinatura)
@@ -497,16 +464,10 @@ namespace Itajobs_API.src.Services
             return conteudo.AsSpan().StartsWith(assinatura);
         }
 
-        /// <summary>So o nome (sem pasta), cortado no tamanho da coluna; vazio vira um padrao.</summary>
         private static string NomeDoArquivo(string nomeOriginal, TipoArquivo tipo, string contentType)
         {
-            var nome = Path.GetFileName(nomeOriginal ?? string.Empty).Trim();
-            if (nome.Length == 0)
-            {
-                nome = tipo == TipoArquivo.Pdf ? "curriculo.pdf" : $"foto.{contentType[(contentType.IndexOf('/') + 1)..]}";
-            }
-
-            return nome.Length > 255 ? nome[^255..] : nome;
+            return Imagem.NomeDoArquivo(nomeOriginal,
+                tipo == TipoArquivo.Pdf ? "curriculo.pdf" : $"foto.{Imagem.Extensao(contentType)}");
         }
 
         private static void ValidarFormacao(DateOnly inicio, DateOnly? fim)
@@ -599,6 +560,7 @@ namespace Itajobs_API.src.Services
             Id = curriculo.Id,
             IdCandidato = curriculo.IdCandidato,
             NomeCandidato = $"{curriculo.Candidato.Nome} {curriculo.Candidato.Sobrenome}",
+            TituloProfissional = curriculo.TituloProfissional,
             Resumo = curriculo.Resumo,
             Portfolio = curriculo.Portfolio,
             Experiencias = curriculo.Experiencias.Select(ToDTO).ToList(),

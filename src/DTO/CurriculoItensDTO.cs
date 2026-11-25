@@ -4,11 +4,15 @@ using Itajobs_API.src.Models;
 namespace Itajobs_API.src.DTO
 {
     /// <summary>
-    /// Corpo do <c>PUT /api/curriculo/{id}</c>. Substitui os dois campos: o que vier
+    /// Corpo do <c>PUT /api/curriculo/{id}</c>. Substitui os tres campos: o que vier
     /// vazio (ou nao vier) e apagado.
     /// </summary>
     public class CurriculoUpdateDTO
     {
+        /// <summary>"Soldador naval", "Auxiliar de logistica"... Vazio apaga.</summary>
+        [StringLength(100)]
+        public string? TituloProfissional { get; set; }
+
         /// <summary>Resumo profissional. Vazio apaga.</summary>
         [StringLength(2000)]
         public string? Resumo { get; set; }

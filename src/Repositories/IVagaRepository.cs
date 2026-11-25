@@ -14,6 +14,8 @@ namespace Itajobs_API.src.Repositories
         decimal? SalarioMaximo,
         TipoContrato? TipoContrato,
         Jornada? Jornada,
+        Modalidade? Modalidade,
+        string? PalavraChave,
         StatusVaga? Status,
         int Pagina,
         int TamanhoPagina);

@@ -128,12 +128,21 @@ As rotas estao em [Endpoints > Autenticacao](#autenticacao--apiauth).
 - **Limite de tentativas:** 5 logins por minuto por IP (`LOGIN_TENTATIVAS_POR_MINUTO`);
   passou disso, 429. Atras do proxy do Next vale o IP do `X-Forwarded-For`.
 - **Toda rota exige login**, menos as marcadas com `[AllowAnonymous]`: cadastro de
-  candidato e de empresa, login e listagem/detalhe de vagas. Rota nova ja nasce
-  protegida.
+  candidato e de empresa, login (senha e Google), recuperacao de senha,
+  listagem/detalhe de vagas e imagens das empresas. Rota nova ja nasce protegida.
 - Cada um so altera os proprios dados; empresas podem ver candidatos e curriculos.
   As regras de cada controller estao no `<remarks>` dele.
-- A senha e guardada so como hash (PBKDF2, `SenhaHasher`). O e-mail e unico dentro de
-  cada tipo de conta, por isso o login pede o `tipo`.
+- A senha e guardada so como hash (PBKDF2, `SenhaHasher`). O **e-mail e unico entre
+  todas as contas** (candidatos e empresas; indice unico `lower(btrim(email))` no
+  banco), entao o login so precisa de e-mail e senha. O `tipo` continua aceito.
+- **Esqueci a senha:** o link vai por e-mail (SMTP, `SMTP_*`) e vale 30 min, uma vez. O
+  banco guarda so o SHA-256 do token. Sem SMTP, em desenvolvimento o e-mail sai no log
+  da API.
+- **Google:** so entra quem ja tem conta. No primeiro acesso, a conta e achada pelo
+  e-mail verificado do Google e fica vinculada pelo `sub`; depois o e-mail do Google
+  pode mudar. Precisa de `GOOGLE_CLIENT_ID`.
+- O limite de 5 por minuto vale tambem para o login com Google e, separado, para
+  esqueci/redefinir senha.
 - Erros seguem o formato da API: 401 sem login, 403 sem permissao, ambos com
   `{ "mensagem": "..." }`.
 
@@ -142,6 +151,9 @@ Chaves no `itajobs.env`:
 ```env
 JWT_SECRET=        # 32+ caracteres aleatorios; trocar invalida todos os logins
 JWT_EXPIRA_HORAS=8
+GOOGLE_CLIENT_ID=  # Client ID OAuth do Google (o mesmo do botao no front)
+SMTP_HOST=         # + SMTP_PORTA, SMTP_SSL, SMTP_USUARIO, SMTP_SENHA, SMTP_REMETENTE
+RECUPERACAO_SENHA_MINUTOS=30
 ```
 
 ## Endereco: so Itajai/SC
@@ -209,9 +221,11 @@ Erro de validacao do DTO (400), com os campos que falharam:
 
 | Campo                      | Valores                                                        |
 | -------------------------- | -------------------------------------------------------------- |
-| `tipo` (login)             | `candidato`, `empresa`                                         |
-| `tipoContrato` (vaga)      | `clt`, `pj`, `estagio`, `temporario`, `aprendiz`               |
+| `tipo` (login, opcional)   | `candidato`, `empresa`                                         |
+| `tipoContrato` (vaga)      | `clt`, `pj`, `estagio`, `temporario`, `aprendiz`, `diaria`     |
 | `jornada` (vaga)           | `integral`, `meioPeriodo`, `noturno`, `escala`                 |
+| `modalidade` (vaga)        | `presencial`, `hibrido`, `remoto` (opcional)                   |
+| `tipo` (imagem da empresa) | `logo`, `banner`, `galeria`                                    |
 | `status` (vaga)            | `aberta`, `encerrada`                                          |
 | `status` (candidatura)     | `recebida`, `emAnalise`, `aprovada`, `recusada`                |
 | `nivel` (formacao)         | `fundamental`, `medio`, `tecnico`, `superior`, `posGraduacao`  |
@@ -225,10 +239,24 @@ Erro de validacao do DTO (400), com os campos que falharam:
 | POST  | `/api/auth/login` | Publico | `LoginDTO`       | 200 + `TokenDTO`       | 400, 401, 429                   |
 | GET   | `/api/auth/me`    | Logado  | —                | 200 + usuario logado   | 401                             |
 | PUT   | `/api/auth/senha` | Logado  | `TrocarSenhaDTO` | 204                    | 400 (senha atual errada, igual ou curta), 401 |
+| POST  | `/api/auth/esqueci-senha`   | Publico | `{ email }`            | 202 (sempre)     | 400, 429                   |
+| POST  | `/api/auth/redefinir-senha` | Publico | `{ token, novaSenha }` | 204              | 400 (link invalido, expirado ou usado), 429 |
+| POST  | `/api/auth/google`          | Publico | `{ idToken }`          | 200 + `TokenDTO` | 401 (token do Google invalido), 404 (sem conta), 429, 503 (sem `GOOGLE_CLIENT_ID`) |
+| POST  | `/api/auth/google/vincular` | Logado  | `{ idToken }`          | 204              | 401, 409 (Google de outra conta, ou conta ja com outro Google), 503 |
+| DELETE| `/api/auth/google`          | Logado  | —                      | 204              | 401, 404 (sem vinculo)     |
+
+- **Esqueci a senha:** responde 202 com a mesma mensagem exista a conta ou nao. Pedir
+  de novo invalida o link anterior. O link e `{FRONTEND_URL}/redefinir-senha?token=...`
+  (ou `RECUPERACAO_SENHA_URL`); a pagina do front manda o `token` para
+  `redefinir-senha`.
+- **Google:** o front usa o botao "Entrar com Google" (Google Identity Services) e manda
+  o `credential` (ID token) como `idToken`. A API confere assinatura, emissor, validade
+  e se o token e do nosso `GOOGLE_CLIENT_ID`. Sem conta com aquele Google nem com o
+  e-mail dele: 404 (o cadastro continua pelo formulario, que pede CPF/CNPJ e CEP).
 
 ```jsonc
-// POST /api/auth/login
-{ "email": "marina@teste.com", "senha": "senha1234", "tipo": "candidato" }
+// POST /api/auth/login  (tipo opcional; se vier, a conta precisa ser desse tipo)
+{ "email": "marina@teste.com", "senha": "senha1234" }
 
 // 200
 {
@@ -239,6 +267,15 @@ Erro de validacao do DTO (400), com os campos que falharam:
 
 // PUT /api/auth/senha  (senha nova: 8 a 100 caracteres)
 { "senhaAtual": "senha1234", "novaSenha": "outraSenha9" }
+
+// POST /api/auth/esqueci-senha        -> 202
+{ "email": "marina@teste.com" }
+
+// POST /api/auth/redefinir-senha      -> 204
+{ "token": "o-token-do-link", "novaSenha": "outraSenha9" }
+
+// POST /api/auth/google               -> 200 (mesmo TokenDTO do login)
+{ "idToken": "eyJhbGciOiJSUzI1NiIs..." }
 ```
 
 `GET /api/auth/me` devolve o mesmo objeto de `usuario`.
@@ -253,8 +290,8 @@ Erro de validacao do DTO (400), com os campos que falharam:
 | PUT    | `/api/candidato/{id}` | Proprio         | `CandidatoCreateDTO` | 200 + `CandidatoDTO`       | 400, 401, 403, 404, 409, 503 |
 | DELETE | `/api/candidato/{id}` | Proprio         | —                    | 204                        | 401, 403, 404            |
 
-- **POST:** CPF com digitos verificadores validos, CPF e e-mail unicos entre
-  candidatos, CEP de Itajai/SC (ver [Endereco](#endereco-so-itajaisc)), senha
+- **POST:** CPF com digitos verificadores validos, CPF unico entre candidatos, e-mail
+  unico entre todas as contas (409 se uma empresa ja usa), CEP de Itajai/SC (ver [Endereco](#endereco-so-itajaisc)), senha
   obrigatoria.
 - **PUT:** mesmas regras; o campo `senha` e ignorado (troca so por `PUT /api/auth/senha`).
 - **DELETE:** apaga junto endereco, contato, curriculo, candidaturas e avaliacoes.
@@ -297,10 +334,14 @@ Erro de validacao do DTO (400), com os campos que falharam:
 | DELETE | `/api/empresa/{id}` | Proprio | —                  | 204                      | 401, 403, 404                |
 
 - **POST/PUT:** CNPJ com digitos verificadores validos (aceita o CNPJ alfanumerico),
-  CNPJ e e-mail unicos entre empresas, CEP de Itajai/SC. O `senha` segue a mesma
-  regra do candidato.
+  CNPJ unico entre empresas, e-mail unico entre todas as contas, CEP de Itajai/SC. O
+  `senha` segue a mesma regra do candidato.
+- **Perfil publico** (tudo opcional; no PUT, vazio ou ausente apaga): `razaoSocial` ate
+  200, `ramoAtuacao` ate 100, `descricaoCurta` ate 500, `sobre` ate 5000, `site` ate 255
+  (link http/https), `linkedin` ate 255 (link do linkedin.com).
 - **`nota`** nao se edita: e a media das [avaliacoes](#avaliacoes--apiempresaidempresaavaliacoes).
-- **DELETE:** apaga junto endereco, contato, vagas, as candidaturas delas e as avaliacoes.
+- **DELETE:** apaga junto endereco, contato, vagas, as candidaturas delas, as
+  avaliacoes e as imagens.
 
 ```jsonc
 // POST /api/empresa
@@ -309,7 +350,13 @@ Erro de validacao do DTO (400), com os campos que falharam:
   "cnpj": "11.222.333/0001-81",
   "senha": "senha1234",
   "endereco": { "cep": "88302-000", "numero": "20" },
-  "contato": { "email": "rh@portopesca.com", "telefone": "4733330000" }
+  "contato": { "email": "rh@portopesca.com", "telefone": "4733330000" },
+  "razaoSocial": "Porto Pesca Comercio de Pescados Ltda.",
+  "ramoAtuacao": "Pesca e logistica portuaria",
+  "descricaoCurta": "Distribuidora de pescados no porto de Itajai.",
+  "sobre": "Texto longo da pagina da empresa...",
+  "site": "https://portopesca.com.br",
+  "linkedin": "https://www.linkedin.com/company/portopesca"
 }
 
 // 201 (EmpresaDTO)
@@ -317,8 +364,54 @@ Erro de validacao do DTO (400), com os campos que falharam:
   "id": 1, "nome": "Porto Pesca Ltda.", "cnpj": "11222333000181",
   "nota": null,                        // media 1..5; null sem avaliacao
   "totalAvaliacoes": 0,
+  "razaoSocial": "...", "ramoAtuacao": "...", "descricaoCurta": "...",
+  "sobre": "...", "site": "...", "linkedin": "...",
   "endereco": { ... }, "contato": { ... }
 }
+```
+
+### Imagens da empresa — `/api/empresa/{idEmpresa}/imagens`
+
+Uma logo, um banner e uma galeria de fotos. **Ver e baixar e publico** (a `url` serve
+direto num `<img src>`); enviar, reordenar e apagar, so a propria empresa.
+
+| Verbo  | Rota                                             | Acesso  | Corpo                              | Sucesso                    | Erros                   |
+| ------ | ------------------------------------------------ | ------- | ---------------------------------- | -------------------------- | ----------------------- |
+| GET    | `/api/empresa/{id}/imagens`                      | Publico | —                                  | 200 + lista `EmpresaImagemDTO` | 404                 |
+| PUT    | `/api/empresa/{id}/imagens/{logo\|banner}`       | Proprio | multipart `arquivo`                | 200 + `EmpresaImagemDTO`   | 400, 401, 403, 404, 413 |
+| GET    | `/api/empresa/{id}/imagens/{logo\|banner}`       | Publico | —                                  | 200 + a imagem (binario)   | 404                     |
+| DELETE | `/api/empresa/{id}/imagens/{logo\|banner}`       | Proprio | —                                  | 204                        | 401, 403, 404           |
+| POST   | `/api/empresa/{id}/imagens/galeria`              | Proprio | multipart `arquivo` + `ordem` opcional | 201 + `EmpresaImagemDTO` | 400, 401, 403, 404, 413 |
+| GET    | `/api/empresa/{id}/imagens/galeria/{idImagem}`   | Publico | —                                  | 200 + a imagem (binario)   | 404                     |
+| PATCH  | `/api/empresa/{id}/imagens/galeria/{idImagem}`   | Proprio | `{ ordem }` (0 a 1000)             | 204                        | 400, 401, 403, 404      |
+| DELETE | `/api/empresa/{id}/imagens/galeria/{idImagem}`   | Proprio | —                                  | 204                        | 401, 403, 404           |
+
+- **Formatos:** JPG, PNG ou WebP, conferido pelo conteudo do arquivo (nao pelo nome).
+- **Tamanhos:** logo ate 2 MB, banner ate 5 MB, cada foto da galeria ate 5 MB; no
+  maximo 10 fotos na galeria.
+- **Logo e banner:** enviar de novo substitui (indice unico parcial no banco).
+- **Galeria:** sem `ordem`, a foto vai para o fim. A lista vem: logo, banner, galeria
+  pela `ordem`.
+- O download sai com `Cache-Control: public, max-age=300`. A `url` da lista leva
+  `?v=` com a data do envio, entao muda quando a imagem e trocada.
+
+```jsonc
+// GET /api/empresa/1/imagens
+[
+  { "id": 4, "tipo": "logo", "ordem": 0, "nome": "logo.png", "contentType": "image/png",
+    "tamanho": 18211, "enviadoEm": "2026-11-20T17:30:02.123456Z",
+    "url": "/api/empresa/1/imagens/logo?v=639000000000000000" },
+  { "id": 7, "tipo": "galeria", "ordem": 0, "nome": "galpao.jpg", "contentType": "image/jpeg",
+    "tamanho": 402113, "enviadoEm": "2026-11-20T17:31:40Z",
+    "url": "/api/empresa/1/imagens/galeria/7?v=639000000000000000" }
+]
+```
+
+```bash
+curl -X PUT http://localhost:8080/api/empresa/1/imagens/logo \
+  -H "Authorization: Bearer $TOKEN" -F "arquivo=@logo.png"
+curl -X POST http://localhost:8080/api/empresa/1/imagens/galeria \
+  -H "Authorization: Bearer $TOKEN" -F "arquivo=@galpao.jpg" -F "ordem=0"
 ```
 
 ### Vagas — `/api/vaga`
@@ -333,8 +426,21 @@ Erro de validacao do DTO (400), com os campos que falharam:
 | DELETE | `/api/vaga/{id}`        | Empresa dona | —               | 204                         | 401, 403, 404           |
 
 - **POST/PUT:** o `idEmpresa` do corpo tem que ser a empresa logada, e a vaga nao troca
-  de empresa no PUT. Salario, se vier, maior que zero. Sem `bairro`, vale o da empresa.
-  A vaga nasce `aberta`; o status so muda pelo PATCH.
+  de empresa no PUT. Sem `bairro`, vale o da empresa. A vaga nasce `aberta`; o status
+  so muda pelo PATCH.
+- **Remuneracao** (CHECK `ck_vaga_remuneracao` no banco), uma de tres formas:
+
+  | Forma      | `salario` | `salarioMinimo` | `salarioMaximo`  |
+  | ---------- | --------- | --------------- | ---------------- |
+  | A combinar | null      | null            | null             |
+  | Fixo       | > 0       | null            | null             |
+  | Faixa      | null      | > 0             | >= minimo        |
+
+  Valores ate 99.999.999,99. Qualquer outra combinacao: 400.
+- **`modalidade`** opcional: `presencial`, `hibrido` ou `remoto`.
+- **`palavrasChave`** opcional: ate 20, cada uma ate 100 caracteres. Espacos nas pontas
+  saem, vazias sao ignoradas e repetidas (sem diferenciar maiuscula) entram uma vez.
+  O PUT substitui a lista (ausente = sem palavras).
 - **PATCH status:** `aberta` ou `encerrada`. Vaga encerrada continua visivel, mas nao
   aceita candidatura.
 - **DELETE:** apaga junto as candidaturas.
@@ -345,10 +451,12 @@ Filtros do `GET /api/vaga` (todos opcionais):
 | --------------- | ---------------------------------------------------------------- |
 | `cargo`         | busca parcial, sem diferenciar maiuscula                         |
 | `bairro`        | bairro exato, sem diferenciar maiuscula                          |
-| `salarioMinimo` | `salario >= valor` (vagas "a combinar" ficam de fora)            |
-| `salarioMaximo` | `salario <= valor`                                               |
+| `salarioMinimo` | paga pelo menos isso: fixo `>=` valor, ou maximo da faixa `>=` valor ("a combinar" fica de fora) |
+| `salarioMaximo` | fixo `<=` valor, ou minimo da faixa `<=` valor                   |
 | `tipoContrato`  | um dos valores do enum                                           |
 | `jornada`       | um dos valores do enum                                           |
+| `modalidade`    | um dos valores do enum                                           |
+| `palavraChave`  | palavra-chave exata da vaga, sem diferenciar maiuscula           |
 | `status`        | sem informar: so `aberta`, menos quando filtra por `idEmpresa` (ai vem todas) |
 | `idEmpresa`     | vagas de uma empresa (o painel da empresa)                       |
 | `pagina`        | comeca em 1 (padrao 1)                                           |
@@ -368,7 +476,11 @@ Ordem: das mais novas para as mais antigas.
   "idEmpresa": 1,
   "cargo": "Soldador",                 // 2 a 45
   "descricao": "Solda MIG em estruturas navais.",
-  "salario": 3200.00,                  // opcional; null = "a combinar"
+  "salario": null,                     // fixo; ou use a faixa abaixo
+  "salarioMinimo": 2800.00,            // faixa: minimo e maximo juntos
+  "salarioMaximo": 3600.00,
+  "modalidade": "presencial",          // opcional
+  "palavrasChave": ["solda", "MIG", "naval"],   // opcional, ate 20
   "tipoContrato": "clt",               // obrigatorio
   "jornada": "escala",                 // obrigatorio
   "bairro": null,                      // opcional; null = bairro da empresa
@@ -378,7 +490,9 @@ Ordem: das mais novas para as mais antigas.
 // VagaDTO
 {
   "id": 5, "idEmpresa": 1, "nomeEmpresa": "Porto Pesca Ltda.",
-  "cargo": "Soldador", "descricao": "...", "salario": 3200.00,
+  "cargo": "Soldador", "descricao": "...",
+  "salario": null, "salarioMinimo": 2800.00, "salarioMaximo": 3600.00,
+  "modalidade": "presencial", "palavrasChave": ["solda", "MIG", "naval"],
   "tipoContrato": "clt", "jornada": "escala", "bairro": "Fazenda",
   "requisitos": "...", "status": "aberta", "dataPublicacao": "2026-11-09T14:29:56"
 }
@@ -457,7 +571,7 @@ projetos, idiomas) e arquivos, o acesso de escrita e sempre do **candidato dono*
 | GET    | `/api/curriculo/{id}`                        | Proprio/empresa | —                    | 200 + `CurriculoDTO`     | 401, 403, 404      |
 | GET    | `/api/candidato/{idCandidato}/curriculo`     | Proprio/empresa | —                    | 200 + `CurriculoDTO`     | 401, 403, 404 (sem curriculo) |
 | POST   | `/api/curriculo`                             | Proprio         | `{ idCandidato }`    | 201 + `CurriculoDTO`     | 401, 403, 404, 409 (ja tem) |
-| PUT    | `/api/curriculo/{id}`                        | Proprio         | `{ resumo, portfolio }` | 200 + `CurriculoDTO`  | 400, 401, 403, 404 |
+| PUT    | `/api/curriculo/{id}`                        | Proprio         | `{ tituloProfissional, resumo, portfolio }` | 200 + `CurriculoDTO`  | 400, 401, 403, 404 |
 | DELETE | `/api/curriculo/{id}`                        | Proprio         | —                    | 204                      | 401, 403, 404      |
 | POST   | `/api/curriculo/{id}/experiencias`           | Proprio         | `ExperienciaCreateDTO` | 201 + `ExperienciaDTO` | 400, 401, 403, 404 |
 | PUT    | `/api/curriculo/{id}/experiencias/{idExp}`   | Proprio         | `ExperienciaCreateDTO` | 200 + `ExperienciaDTO` | 400, 401, 403, 404 |
@@ -491,9 +605,10 @@ Regras dos itens:
 - **Projeto:** `titulo` 2 a 100, `descricao` ate 1000.
 - **Idioma:** `idioma` 2 a 45, `nivel` obrigatorio. Nao se repete no curriculo (sem
   diferenciar maiuscula); 409 no POST e no PUT.
-- **Resumo e portfolio** (`PUT /api/curriculo/{id}`): resumo ate 2000, portfolio ate 255
-  e precisa ser link `http://` ou `https://`. O PUT substitui os dois: o que vier vazio
-  ou nao vier e apagado.
+- **Titulo, resumo e portfolio** (`PUT /api/curriculo/{id}`): `tituloProfissional` ate
+  100 ("Soldador naval"), resumo ate 2000, portfolio ate 255 e precisa ser link
+  `http://` ou `https://`. O PUT substitui os tres: o que vier vazio ou nao vier e
+  apagado.
 - **Arquivos:** um PDF (ate 5 MB) e uma foto JPG, PNG ou WebP (ate 2 MB); enviar de novo
   substitui. O tipo e conferido pelo conteudo, nao pelo nome. O download sai `inline`
   com o `Content-Type` real. Como exige token, a tela baixa com `fetch` e monta um
@@ -523,12 +638,14 @@ Regras dos itens:
 { "idioma": "Ingles", "nivel": "intermediario" }
 
 // PUT /api/curriculo/2
-{ "resumo": "Soldador com 5 anos de experiencia em estaleiro.",
+{ "tituloProfissional": "Soldador naval",
+  "resumo": "Soldador com 5 anos de experiencia em estaleiro.",
   "portfolio": "https://github.com/marina" }
 
 // CurriculoDTO
 {
   "id": 2, "idCandidato": 3, "nomeCandidato": "Marina Deschamps",
+  "tituloProfissional": "Soldador naval",
   "resumo": "...", "portfolio": "https://github.com/marina",
   "experiencias": [ { "id": 1, "cargo": "Soldador", "nomeEmpresa": "Estaleiro Sul",
                       "dataInicio": "2021-03-01", "dataFim": null, "descricao": "..." } ],

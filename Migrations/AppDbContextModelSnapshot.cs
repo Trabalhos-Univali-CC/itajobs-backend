@@ -115,7 +115,10 @@ namespace Itajobs_API.Migrations
 
                     b.HasIndex("Email");
 
-                    b.ToTable("contato", (string)null);
+                    b.ToTable("contato", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_contato_email_normalizado", "email = lower(btrim(email)) AND email <> ''");
+                        });
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.Curriculo", b =>
@@ -139,6 +142,11 @@ namespace Itajobs_API.Migrations
                     b.Property<string>("Resumo")
                         .HasColumnType("text")
                         .HasColumnName("resumo");
+
+                    b.Property<string>("TituloProfissional")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("titulo_profissional");
 
                     b.HasKey("Id");
 
@@ -189,6 +197,80 @@ namespace Itajobs_API.Migrations
                     b.ToTable("curriculo_arquivo", (string)null);
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.EmpresaArquivo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<byte[]>("Conteudo")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("conteudo");
+
+                    b.Property<DateTime>("EnviadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviado_em")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("IdEmpresa")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("nome");
+
+                    b.Property<int>("Ordem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("ordem");
+
+                    b.Property<int>("Tamanho")
+                        .HasColumnType("integer")
+                        .HasColumnName("tamanho");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("tipo");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdEmpresa", "Tipo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_empresa_arquivo_logo_banner")
+                        .HasFilter("tipo IN ('Logo', 'Banner')");
+
+                    b.HasIndex("IdEmpresa", "Tipo", "Ordem", "Id")
+                        .HasDatabaseName("ix_empresa_arquivo_galeria");
+
+                    b.ToTable("empresa_arquivo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_empresa_arquivo_content_type", "content_type IN ('image/jpeg', 'image/png', 'image/webp')");
+
+                            t.HasCheckConstraint("ck_empresa_arquivo_ordem", "ordem >= 0");
+
+                            t.HasCheckConstraint("ck_empresa_arquivo_tamanho", "tamanho > 0");
+
+                            t.HasCheckConstraint("ck_empresa_arquivo_tipo", "tipo IN ('Logo', 'Banner', 'Galeria')");
+                        });
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.Endereco", b =>
                 {
                     b.Property<int>("Id")
@@ -235,6 +317,60 @@ namespace Itajobs_API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("endereco", (string)null);
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.IdentidadeExterna", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int?>("IdCandidato")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_candidato");
+
+                    b.Property<int?>("IdEmpresa")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<string>("IdentificadorExterno")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("identificador_externo");
+
+                    b.Property<string>("Provedor")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provedor");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCandidato");
+
+                    b.HasIndex("IdEmpresa");
+
+                    b.HasIndex("Provedor", "IdentificadorExterno")
+                        .IsUnique();
+
+                    b.ToTable("identidade_externa", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_identidade_externa_identificador", "identificador_externo <> ''");
+
+                            t.HasCheckConstraint("ck_identidade_externa_provedor", "provedor IN ('google')");
+
+                            t.HasCheckConstraint("ck_identidade_externa_titular", "(id_candidato IS NULL) <> (id_empresa IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.LogCurso", b =>
@@ -454,6 +590,60 @@ namespace Itajobs_API.Migrations
                     b.ToTable("logs_projetos", (string)null);
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.RecuperacaoSenha", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expira_em");
+
+                    b.Property<int?>("IdCandidato")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_candidato");
+
+                    b.Property<int?>("IdEmpresa")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_empresa");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime?>("UtilizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("utilizado_em");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCandidato");
+
+                    b.HasIndex("IdEmpresa");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("recuperacao_senha", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_recuperacao_senha_expira", "expira_em > criado_em");
+
+                            t.HasCheckConstraint("ck_recuperacao_senha_titular", "(id_candidato IS NULL) <> (id_empresa IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.UsuarioCandidato", b =>
                 {
                     b.Property<int>("Id")
@@ -522,6 +712,11 @@ namespace Itajobs_API.Migrations
                         .HasColumnType("character varying(14)")
                         .HasColumnName("cnpj");
 
+                    b.Property<string>("DescricaoCurta")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("descricao_curta");
+
                     b.Property<int>("IdContato")
                         .HasColumnType("integer")
                         .HasColumnName("id_contato");
@@ -529,6 +724,11 @@ namespace Itajobs_API.Migrations
                     b.Property<int>("IdEndereco")
                         .HasColumnType("integer")
                         .HasColumnName("id_endereco");
+
+                    b.Property<string>("Linkedin")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("linkedin");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -540,11 +740,30 @@ namespace Itajobs_API.Migrations
                         .HasColumnType("decimal(5,2)")
                         .HasColumnName("nota");
 
+                    b.Property<string>("RamoAtuacao")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("ramo_atuacao");
+
+                    b.Property<string>("RazaoSocial")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("razao_social");
+
                     b.Property<string>("SenhaHash")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("senha_hash");
+
+                    b.Property<string>("Site")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("site");
+
+                    b.Property<string>("Sobre")
+                        .HasColumnType("text")
+                        .HasColumnName("sobre");
 
                     b.HasKey("Id");
 
@@ -599,6 +818,11 @@ namespace Itajobs_API.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("jornada");
 
+                    b.Property<string>("Modalidade")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("modalidade");
+
                     b.Property<string>("Requisitos")
                         .HasColumnType("text")
                         .HasColumnName("requisitos");
@@ -606,6 +830,14 @@ namespace Itajobs_API.Migrations
                     b.Property<decimal?>("Salario")
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("salario");
+
+                    b.Property<decimal?>("SalarioMaximo")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("salario_maximo");
+
+                    b.Property<decimal?>("SalarioMinimo")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("salario_minimo");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -625,7 +857,43 @@ namespace Itajobs_API.Migrations
 
                     b.HasIndex("Status", "DataPublicacao");
 
-                    b.ToTable("vaga", (string)null);
+                    b.ToTable("vaga", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_vaga_modalidade", "modalidade IS NULL OR modalidade IN ('Presencial', 'Hibrido', 'Remoto')");
+
+                            t.HasCheckConstraint("ck_vaga_remuneracao", "(salario IS NULL AND salario_minimo IS NULL AND salario_maximo IS NULL) OR (salario > 0 AND salario_minimo IS NULL AND salario_maximo IS NULL) OR (salario IS NULL AND salario_minimo > 0 AND salario_maximo >= salario_minimo)");
+
+                            t.HasCheckConstraint("ck_vaga_tipo_contrato", "tipo_contrato IN ('Clt', 'Pj', 'Estagio', 'Temporario', 'Aprendiz', 'Diaria')");
+                        });
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.VagaPalavraChave", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("descricao");
+
+                    b.Property<int>("IdVaga")
+                        .HasColumnType("integer")
+                        .HasColumnName("id_vaga");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdVaga");
+
+                    b.ToTable("vaga_palavra_chave", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_vaga_palavra_chave_descricao", "descricao = btrim(descricao) AND descricao <> ''");
+                        });
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.AvaliacaoEmpresa", b =>
@@ -686,6 +954,28 @@ namespace Itajobs_API.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.EmpresaArquivo", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.UsuarioEmpresa", null)
+                        .WithMany("Imagens")
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Itajobs_API.src.Models.IdentidadeExterna", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.UsuarioCandidato", null)
+                        .WithMany()
+                        .HasForeignKey("IdCandidato")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Itajobs_API.src.Models.UsuarioEmpresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.LogCurso", b =>
                 {
                     b.HasOne("Itajobs_API.src.Models.Curriculo", null)
@@ -740,6 +1030,19 @@ namespace Itajobs_API.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.RecuperacaoSenha", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.UsuarioCandidato", null)
+                        .WithMany()
+                        .HasForeignKey("IdCandidato")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Itajobs_API.src.Models.UsuarioEmpresa", null)
+                        .WithMany()
+                        .HasForeignKey("IdEmpresa")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.UsuarioCandidato", b =>
                 {
                     b.HasOne("Itajobs_API.src.Models.Contato", "Contato")
@@ -789,6 +1092,15 @@ namespace Itajobs_API.Migrations
                     b.Navigation("Empresa");
                 });
 
+            modelBuilder.Entity("Itajobs_API.src.Models.VagaPalavraChave", b =>
+                {
+                    b.HasOne("Itajobs_API.src.Models.Vaga", null)
+                        .WithMany("PalavrasChave")
+                        .HasForeignKey("IdVaga")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Itajobs_API.src.Models.Curriculo", b =>
                 {
                     b.Navigation("Arquivos");
@@ -817,12 +1129,16 @@ namespace Itajobs_API.Migrations
                 {
                     b.Navigation("Avaliacoes");
 
+                    b.Navigation("Imagens");
+
                     b.Navigation("Vagas");
                 });
 
             modelBuilder.Entity("Itajobs_API.src.Models.Vaga", b =>
                 {
                     b.Navigation("Candidaturas");
+
+                    b.Navigation("PalavrasChave");
                 });
 #pragma warning restore 612, 618
         }

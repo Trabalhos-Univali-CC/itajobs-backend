@@ -16,7 +16,27 @@ namespace Itajobs_API.src.Models
         Pj,
         Estagio,
         Temporario,
-        Aprendiz
+        Aprendiz,
+        /// <summary>Trabalho por dia (diarista, bico de descarga no porto...).</summary>
+        Diaria
+    }
+
+    /// <summary>Onde o trabalho acontece. Opcional na vaga.</summary>
+    public enum Modalidade
+    {
+        Presencial,
+        Hibrido,
+        Remoto
+    }
+
+    /// <summary>
+    /// Imagens do perfil da empresa: uma logo, um banner e varias fotos de galeria.
+    /// </summary>
+    public enum TipoImagemEmpresa
+    {
+        Logo,
+        Banner,
+        Galeria
     }
 
     public enum Jornada

@@ -18,7 +18,16 @@ namespace Itajobs_API.src.DTO
 
         public string Descricao { get; set; } = string.Empty;
 
+        /// <summary>Fixo. Os tres salarios <c>null</c> = "a combinar".</summary>
         public decimal? Salario { get; set; }
+
+        public decimal? SalarioMinimo { get; set; }
+
+        public decimal? SalarioMaximo { get; set; }
+
+        public Modalidade? Modalidade { get; set; }
+
+        public List<string> PalavrasChave { get; set; } = [];
 
         public TipoContrato TipoContrato { get; set; }
 

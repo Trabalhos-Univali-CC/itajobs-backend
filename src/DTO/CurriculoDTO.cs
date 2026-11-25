@@ -12,6 +12,8 @@ namespace Itajobs_API.src.DTO
 
         public string NomeCandidato { get; set; } = string.Empty;
 
+        public string? TituloProfissional { get; set; }
+
         public string? Resumo { get; set; }
 
         public string? Portfolio { get; set; }

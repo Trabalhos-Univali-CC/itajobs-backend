@@ -11,7 +11,8 @@ namespace Itajobs_API.src.Services
     /// <list type="bullet">
     /// <item>A vaga pertence a uma empresa que precisa existir.</item>
     /// <item>A vaga nao troca de empresa depois de criada.</item>
-    /// <item>Salario, quando informado, e maior que zero.</item>
+    /// <item>Remuneracao: "a combinar" (nada), salario fixo, ou faixa (minimo e maximo, maximo >= minimo). Nunca fixo e faixa juntos.</item>
+    /// <item>Palavras-chave: ate 20, sem espacos nas pontas; repetidas (sem diferenciar maiuscula) entram uma vez.</item>
     /// <item>Sem bairro informado, a vaga fica no bairro da empresa.</item>
     /// <item>Nasce aberta; so a rota de status encerra ou reabre. Encerrada nao aceita candidatura.</item>
     /// <item>A busca, sem status informado, mostra so abertas, menos quando filtra por empresa.</item>
@@ -47,6 +48,8 @@ namespace Itajobs_API.src.Services
                 filtro.SalarioMaximo,
                 filtro.TipoContrato,
                 filtro.Jornada,
+                filtro.Modalidade,
+                filtro.PalavraChave?.Trim(),
                 status,
                 filtro.Pagina,
                 filtro.TamanhoPagina));
@@ -68,7 +71,8 @@ namespace Itajobs_API.src.Services
 
         public async Task<VagaDTO> CreateAsync(VagaCreateDTO dto)
         {
-            ValidarSalario(dto.Salario);
+            ValidarRemuneracao(dto);
+            var palavras = NormalizarPalavrasChave(dto.PalavrasChave);
 
             var idEmpresa = dto.IdEmpresa!.Value;
             var empresa = await _empresaRepository.GetByIdAsync(idEmpresa)
@@ -76,6 +80,7 @@ namespace Itajobs_API.src.Services
 
             var vaga = new Vaga { IdEmpresa = idEmpresa, Status = StatusVaga.Aberta };
             Copiar(dto, vaga, bairroPadrao: empresa.Endereco.Bairro);
+            AplicarPalavrasChave(vaga, palavras);
 
             var criada = await _repository.CreateAsync(vaga);
             return ToDTO(criada);
@@ -83,7 +88,8 @@ namespace Itajobs_API.src.Services
 
         public async Task<VagaDTO?> UpdateAsync(int id, VagaCreateDTO dto)
         {
-            ValidarSalario(dto.Salario);
+            ValidarRemuneracao(dto);
+            var palavras = NormalizarPalavrasChave(dto.PalavrasChave);
 
             var vaga = await _repository.GetByIdAsync(id);
             if (vaga is null)
@@ -99,6 +105,7 @@ namespace Itajobs_API.src.Services
 
             var empresa = await _empresaRepository.GetByIdAsync(vaga.IdEmpresa);
             Copiar(dto, vaga, bairroPadrao: empresa?.Endereco.Bairro);
+            AplicarPalavrasChave(vaga, palavras);
 
             await _repository.UpdateAsync(vaga);
             return ToDTO(vaga);
@@ -130,12 +137,99 @@ namespace Itajobs_API.src.Services
             return true;
         }
 
-        private static void ValidarSalario(decimal? salario)
+        /// <summary>
+        /// As tres formas aceitas (as mesmas do CHECK <c>ck_vaga_remuneracao</c> do banco),
+        /// com mensagem clara em vez do erro do Postgres.
+        /// </summary>
+        private static void ValidarRemuneracao(VagaCreateDTO dto)
         {
-            if (salario is <= 0)
+            var fixo = dto.Salario is not null;
+            var faixa = dto.SalarioMinimo is not null || dto.SalarioMaximo is not null;
+
+            if (fixo && faixa)
             {
                 throw new RegraNegocioException(TipoErro.Invalido,
-                    "O salario, quando informado, deve ser maior que zero.");
+                    "Informe salario fixo (salario) ou faixa (salarioMinimo e salarioMaximo), nao os dois.");
+            }
+
+            if (dto.Salario is <= 0)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido, "O salario deve ser maior que zero.");
+            }
+
+            if (!faixa)
+            {
+                return;
+            }
+
+            if (dto.SalarioMinimo is null || dto.SalarioMaximo is null)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido,
+                    "Na faixa salarial, informe salarioMinimo e salarioMaximo.");
+            }
+
+            if (dto.SalarioMinimo <= 0)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido, "O salarioMinimo deve ser maior que zero.");
+            }
+
+            if (dto.SalarioMaximo < dto.SalarioMinimo)
+            {
+                throw new RegraNegocioException(TipoErro.Invalido,
+                    "O salarioMaximo nao pode ser menor que o salarioMinimo.");
+            }
+        }
+
+        /// <summary>Tira espacos, descarta vazias e repetidas (sem diferenciar maiuscula).</summary>
+        private static List<string> NormalizarPalavrasChave(List<string>? palavras)
+        {
+            var resultado = new List<string>();
+            foreach (var palavra in palavras ?? [])
+            {
+                var limpa = palavra?.Trim() ?? string.Empty;
+                if (limpa.Length == 0)
+                {
+                    continue;
+                }
+
+                if (limpa.Length > 100)
+                {
+                    throw new RegraNegocioException(TipoErro.Invalido,
+                        $"A palavra-chave \"{limpa[..20]}...\" passa de 100 caracteres.");
+                }
+
+                if (!resultado.Any(p => p.Equals(limpa, StringComparison.OrdinalIgnoreCase)))
+                {
+                    resultado.Add(limpa);
+                }
+            }
+
+            return resultado;
+        }
+
+        /// <summary>
+        /// Deixa a vaga com exatamente essas palavras. Mexe so na diferenca: as que ja
+        /// existem ficam (com a grafia nova), as que sairam sao apagadas e as novas
+        /// entram. Assim o indice unico do banco nunca ve a mesma palavra duas vezes.
+        /// </summary>
+        private static void AplicarPalavrasChave(Vaga vaga, List<string> palavras)
+        {
+            vaga.PalavrasChave.RemoveAll(existente =>
+                !palavras.Any(p => p.Equals(existente.Descricao, StringComparison.OrdinalIgnoreCase)));
+
+            foreach (var palavra in palavras)
+            {
+                var existente = vaga.PalavrasChave.FirstOrDefault(p =>
+                    p.Descricao.Equals(palavra, StringComparison.OrdinalIgnoreCase));
+
+                if (existente is null)
+                {
+                    vaga.PalavrasChave.Add(new VagaPalavraChave { Descricao = palavra });
+                }
+                else
+                {
+                    existente.Descricao = palavra;
+                }
             }
         }
 
@@ -144,6 +238,9 @@ namespace Itajobs_API.src.Services
             vaga.Cargo = dto.Cargo.Trim();
             vaga.Descricao = dto.Descricao.Trim();
             vaga.Salario = dto.Salario;
+            vaga.SalarioMinimo = dto.SalarioMinimo;
+            vaga.SalarioMaximo = dto.SalarioMaximo;
+            vaga.Modalidade = dto.Modalidade;
             vaga.TipoContrato = dto.TipoContrato!.Value;
             vaga.Jornada = dto.Jornada!.Value;
             vaga.Bairro = VazioParaNull(dto.Bairro) ?? bairroPadrao;
@@ -163,6 +260,10 @@ namespace Itajobs_API.src.Services
             Cargo = vaga.Cargo,
             Descricao = vaga.Descricao,
             Salario = vaga.Salario,
+            SalarioMinimo = vaga.SalarioMinimo,
+            SalarioMaximo = vaga.SalarioMaximo,
+            Modalidade = vaga.Modalidade,
+            PalavrasChave = vaga.PalavrasChave.Select(p => p.Descricao).ToList(),
             TipoContrato = vaga.TipoContrato,
             Jornada = vaga.Jornada,
             Bairro = vaga.Bairro,

@@ -25,8 +25,21 @@ namespace Itajobs_API.src.Models
         [Column("descricao")]
         public string Descricao { get; set; } = string.Empty;
 
+        // Remuneracao: tudo nulo ("a combinar"), so Salario (fixo) ou SalarioMinimo +
+        // SalarioMaximo (faixa). O banco garante com CHECK; o VagaService explica o erro.
+
+        /// <summary>Salario fixo.</summary>
         [Column("salario", TypeName = "decimal(10,2)")]
         public decimal? Salario { get; set; }
+
+        [Column("salario_minimo", TypeName = "decimal(10,2)")]
+        public decimal? SalarioMinimo { get; set; }
+
+        [Column("salario_maximo", TypeName = "decimal(10,2)")]
+        public decimal? SalarioMaximo { get; set; }
+
+        [Column("modalidade")]
+        public Modalidade? Modalidade { get; set; }
 
         [Column("tipo_contrato")]
         public TipoContrato TipoContrato { get; set; }
@@ -51,5 +64,7 @@ namespace Itajobs_API.src.Models
         public DateTime DataPublicacao { get; set; }
 
         public List<Candidatura> Candidaturas { get; set; } = [];
+
+        public List<VagaPalavraChave> PalavrasChave { get; set; } = [];
     }
 }

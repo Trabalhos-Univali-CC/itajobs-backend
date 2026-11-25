@@ -32,18 +32,22 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor);
 
-// Limite de tentativas de login por IP, contra senha no chute. Passou, 429.
+// Limite de tentativas por IP, contra senha no chute (login, login com Google) e contra
+// abuso do "esqueci a senha" (spam de e-mail, chute de token). Passou, 429.
 var tentativasLogin = int.Parse(EnvLoader.Get(env, "LOGIN_TENTATIVAS_POR_MINUTO", "5"));
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddPolicy(AuthController.LimiteLogin, context => RateLimitPartition.GetFixedWindowLimiter(
-        context.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = tentativasLogin,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0
-        }));
+    foreach (var politica in new[] { AuthController.LimiteLogin, AuthController.LimiteRecuperacao })
+    {
+        options.AddPolicy(politica, context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = tentativasLogin,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    }
 
     options.OnRejected = async (context, token) =>
     {
@@ -54,7 +58,7 @@ builder.Services.AddRateLimiter(options =>
         }
 
         await context.HttpContext.Response.WriteAsJsonAsync(
-            new { mensagem = "Muitas tentativas de login. Espere um minuto e tente de novo." }, token);
+            new { mensagem = "Muitas tentativas. Espere um minuto e tente de novo." }, token);
     };
 });
 
@@ -92,6 +96,35 @@ var jwt = JwtOptions.Criar(
     TimeSpan.FromHours(int.Parse(EnvLoader.Get(env, "JWT_EXPIRA_HORAS", "8"))));
 builder.Services.AddSingleton(jwt);
 builder.Services.AddSingleton<TokenService>();
+
+// Login com Google: GOOGLE_CLIENT_ID (o mesmo do botao no front). Vazio, a rota
+// responde 503 e o resto da API funciona normal.
+builder.Services.AddSingleton(new GoogleTokenService(EnvLoader.Get(env, "GOOGLE_CLIENT_ID", "")));
+
+// Recuperacao de senha: o link do e-mail aponta para a pagina do front.
+var urlFrontend = EnvLoader.Get(env, "FRONTEND_URL", "http://localhost:8080")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+builder.Services.AddSingleton(new RecuperacaoSenhaOptions(
+    EnvLoader.Get(env, "RECUPERACAO_SENHA_URL", $"{urlFrontend.TrimEnd('/')}/redefinir-senha"),
+    TimeSpan.FromMinutes(int.Parse(EnvLoader.Get(env, "RECUPERACAO_SENHA_MINUTOS", "30")))));
+
+// E-mail: SMTP se SMTP_HOST estiver no itajobs.env; senao, so log (ver LogEmailService).
+var smtpHost = EnvLoader.Get(env, "SMTP_HOST", "");
+if (string.IsNullOrWhiteSpace(smtpHost))
+{
+    builder.Services.AddSingleton<IEmailService, LogEmailService>();
+}
+else
+{
+    builder.Services.AddSingleton(new SmtpOptions(
+        smtpHost,
+        int.Parse(EnvLoader.Get(env, "SMTP_PORTA", "587")),
+        bool.Parse(EnvLoader.Get(env, "SMTP_SSL", "true")),
+        EnvLoader.Get(env, "SMTP_USUARIO", ""),
+        EnvLoader.Get(env, "SMTP_SENHA", ""),
+        EnvLoader.Get(env, "SMTP_REMETENTE", EnvLoader.Get(env, "SMTP_USUARIO", ""))));
+    builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -131,10 +164,15 @@ builder.Services.AddHttpClient<ICepService, ViaCepService>(http =>
 
 // Uma linha por camada, para cada entidade nova.
 builder.Services.AddScoped<EnderecoService>();
+
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 builder.Services.AddScoped<EmpresaService>();
+
+builder.Services.AddScoped<IEmpresaImagemRepository, EmpresaImagemRepository>();
+builder.Services.AddScoped<EmpresaImagemService>();
 
 builder.Services.AddScoped<ICandidatoRepository, CandidatoRepository>();
 builder.Services.AddScoped<CandidatoService>();

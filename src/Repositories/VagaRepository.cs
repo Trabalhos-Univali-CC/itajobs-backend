@@ -33,14 +33,27 @@ namespace Itajobs_API.src.Repositories
                 query = query.Where(v => v.Bairro != null && EF.Functions.ILike(v.Bairro, filtro.Bairro));
             }
 
+            // Salario fixo ou faixa. "A combinar" (tudo nulo) nunca passa nesses filtros.
             if (filtro.SalarioMinimo is not null)
             {
-                query = query.Where(v => v.Salario >= filtro.SalarioMinimo);
+                query = query.Where(v => v.Salario >= filtro.SalarioMinimo || v.SalarioMaximo >= filtro.SalarioMinimo);
             }
 
             if (filtro.SalarioMaximo is not null)
             {
-                query = query.Where(v => v.Salario <= filtro.SalarioMaximo);
+                query = query.Where(v => v.Salario <= filtro.SalarioMaximo || v.SalarioMinimo <= filtro.SalarioMaximo);
+            }
+
+            if (filtro.Modalidade is not null)
+            {
+                query = query.Where(v => v.Modalidade == filtro.Modalidade);
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtro.PalavraChave))
+            {
+                // lower(btrim(...)): mesma expressao do indice unico da tabela.
+                var palavra = filtro.PalavraChave.Trim().ToLower();
+                query = query.Where(v => v.PalavrasChave.Any(p => p.Descricao.ToLower() == palavra));
             }
 
             if (filtro.TipoContrato is not null)
@@ -62,9 +75,11 @@ namespace Itajobs_API.src.Repositories
 
             var itens = await query
                 .Include(v => v.Empresa)
+                .Include(v => v.PalavrasChave.OrderBy(p => p.Id))
                 .OrderByDescending(v => v.DataPublicacao).ThenByDescending(v => v.Id)
                 .Skip((filtro.Pagina - 1) * filtro.TamanhoPagina)
                 .Take(filtro.TamanhoPagina)
+                .AsSplitQuery()
                 .ToListAsync();
 
             return (itens, total);
@@ -74,6 +89,8 @@ namespace Itajobs_API.src.Repositories
         {
             return await _context.Vagas
                 .Include(v => v.Empresa)
+                .Include(v => v.PalavrasChave.OrderBy(p => p.Id))
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(v => v.Id == id);
         }
 

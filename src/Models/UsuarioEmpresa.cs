@@ -42,8 +42,38 @@ namespace Itajobs_API.src.Models
         [Column("nota", TypeName = "decimal(5,2)")]
         public decimal? Nota { get; set; }
 
+        // Perfil publico da empresa. Tudo opcional.
+
+        [MaxLength(200)]
+        [Column("razao_social")]
+        public string? RazaoSocial { get; set; }
+
+        [MaxLength(100)]
+        [Column("ramo_atuacao")]
+        public string? RamoAtuacao { get; set; }
+
+        /// <summary>Uma ou duas frases, para cartoes e listagens.</summary>
+        [MaxLength(500)]
+        [Column("descricao_curta")]
+        public string? DescricaoCurta { get; set; }
+
+        /// <summary>Texto longo da pagina da empresa.</summary>
+        [Column("sobre")]
+        public string? Sobre { get; set; }
+
+        [MaxLength(255)]
+        [Column("site")]
+        public string? Site { get; set; }
+
+        [MaxLength(255)]
+        [Column("linkedin")]
+        public string? Linkedin { get; set; }
+
         public List<Vaga> Vagas { get; set; } = [];
 
         public List<AvaliacaoEmpresa> Avaliacoes { get; set; } = [];
+
+        /// <summary>Nunca carregado com <c>Include</c>: tem o conteudo binario.</summary>
+        public List<EmpresaArquivo> Imagens { get; set; } = [];
     }
 }

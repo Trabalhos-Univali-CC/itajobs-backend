@@ -13,6 +13,9 @@ namespace Itajobs_API.src.Repositories
         Task<UsuarioEmpresa?> GetByIdAsync(int id);
 
         /// <summary><paramref name="ignorarId"/> deixa a propria empresa de fora no PUT.</summary>
+        /// <summary>Consulta leve: so se a empresa existe.</summary>
+        Task<bool> ExisteAsync(int id);
+
         Task<bool> CnpjExisteAsync(string cnpj, int? ignorarId = null);
 
         /// <summary>Para o login: procura pelo e-mail do contato (ja em minusculas).</summary>

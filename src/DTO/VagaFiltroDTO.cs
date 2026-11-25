@@ -19,10 +19,14 @@ namespace Itajobs_API.src.DTO
         [StringLength(100)]
         public string? Bairro { get; set; }
 
-        /// <summary>Vagas "a combinar" (sem salario) ficam de fora quando informado.</summary>
+        /// <summary>
+        /// Paga pelo menos isso: salario fixo >= valor, ou o maximo da faixa >= valor.
+        /// Vagas "a combinar" ficam de fora quando um dos filtros de salario vem.
+        /// </summary>
         [Range(0, 1_000_000)]
         public decimal? SalarioMinimo { get; set; }
 
+        /// <summary>Paga no maximo isso: salario fixo &lt;= valor, ou o minimo da faixa &lt;= valor.</summary>
         [Range(0, 1_000_000)]
         public decimal? SalarioMaximo { get; set; }
 
@@ -31,6 +35,13 @@ namespace Itajobs_API.src.DTO
 
         [EnumDataType(typeof(Jornada), ErrorMessage = "Jornada invalida.")]
         public Jornada? Jornada { get; set; }
+
+        [EnumDataType(typeof(Modalidade), ErrorMessage = "Modalidade invalida.")]
+        public Modalidade? Modalidade { get; set; }
+
+        /// <summary>Palavra-chave exata da vaga, sem diferenciar maiuscula.</summary>
+        [StringLength(100)]
+        public string? PalavraChave { get; set; }
 
         /// <summary>
         /// Sem informar: so abertas na busca geral; todas quando filtra por empresa

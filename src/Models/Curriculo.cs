@@ -17,6 +17,11 @@ namespace Itajobs_API.src.Models
 
         public UsuarioCandidato Candidato { get; set; } = null!;
 
+        /// <summary>Como o candidato se apresenta: "Soldador naval", "Auxiliar de logistica"...</summary>
+        [MaxLength(100)]
+        [Column("titulo_profissional")]
+        public string? TituloProfissional { get; set; }
+
         /// <summary>Resumo profissional / objetivo, texto livre.</summary>
         [Column("resumo")]
         public string? Resumo { get; set; }
